@@ -1,0 +1,6 @@
+leela/config.h   porting
+leela/SGFTree.cpp  replace boost
+leela/NNCache.cpp  c++ numeric literly
+leela/Training.cpp      make_unique<char[]>
+leela/Utils.cpp   hack InputPending
+leela/Network.cpp
