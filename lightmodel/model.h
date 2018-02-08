@@ -53,13 +53,14 @@ using zero_net_type =
 template <typename SUBNET> 
 using convs  = relu<bn_conv2d<256,3,SUBNET>>;
 
-using dark_net_type =           softmax<
+using dark_net_type =           fc_no_bias<1,
+                                softmax<
                                 fc_no_bias<board_moves,
                                 con_bias<1,1,1,1,1,
                                 repeat<12, convs,
                                 convs<
                                 input
-                                >>>>>;
+                                >>>>>>;
 
 
 // leela model
@@ -85,6 +86,26 @@ using leela::leela_net_type;
 bool load_zero_weights(zero_net_type& net, const std::string& path);
 bool load_dark_weights(dark_net_type& net, const std::string& path);
 bool load_leela_weights(leela_net_type& net, const std::string& path);
+
+template<typename NET>
+inline const tensor& forward(NET& net, const tensor& input, double temperature, const tensor** value_out) {
+    if (value_out == nullptr) {
+        return layer<7>(net).forward(input);
+    }
+
+    *value_out = &net.forward(input);
+    return layer<7>(net).get_output();
+}
+
+template<>
+inline const tensor& forward(dark_net_type& net, const tensor& input, double temperature, const tensor** value_out) {
+    if (value_out == nullptr) {
+        return layer<1>(net).forward(input);
+    }
+
+    *value_out = &net.forward(input);
+    return layer<1>(net).get_output();
+}
 
 class zero_model {
 public:
@@ -142,7 +163,7 @@ private:
             double temperature, 
             bool darknet_backend);
 
-    const tensor& forward(const tensor& input, double temperature, bool policy_only);
+    const tensor& forward(const tensor& input, double temperature, const tensor** value_out);
 
     template<typename ITER>
     const tensor& features_to_tensor(

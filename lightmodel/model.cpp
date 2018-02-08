@@ -213,6 +213,9 @@ bool load_dark_weights(dark_net_type& net, const std::string& path) {
 
     go_params.push_back({std::vector<int>{board_count, board_moves}, b_w});
 
+    std::vector<float> fake_val_w(board_moves, 0);
+    go_params.push_back({std::vector<int>{board_moves, 1}, fake_val_w});
+
     net.consume_params(go_params.begin());
     return true;
 }
@@ -437,28 +440,14 @@ bool zero_model::load_weights(const std::string& path) {
 }
 
 
-const tensor& zero_model::forward(const tensor& input, double temperature, bool policy_only) {
+const tensor& zero_model::forward(const tensor& input, double temperature, const tensor** value_out) {
 
     if (input.k() == 1) {
-        layer<0>(dark_net).layer_details().set_temprature(temperature);
-        return dark_net.forward(input);
+        return lightmodel::forward(dark_net, input, temperature, value_out);
     } else {
-        if (zero_weights_loaded) {
-            layer<7>(zero_net).layer_details().set_temprature(temperature);
-        } else {
-            layer<7>(leela_net).layer_details().set_temprature(temperature);
-        }
-
-        if (policy_only) {
-            return zero_weights_loaded ? layer<7>(zero_net).forward(input) : layer<7>(leela_net).forward(input);
-        }
-
-        if (zero_weights_loaded) {
-            zero_net.forward(input);
-            return layer<7>(zero_net).get_output();
-        }
-        leela_net.forward(input);
-        return layer<7>(leela_net).get_output();
+        return zero_weights_loaded ? 
+                lightmodel::forward(zero_net, input, temperature, value_out) : 
+                lightmodel::forward(leela_net, input, temperature, value_out);
     }
 }
 
@@ -498,7 +487,7 @@ void zero_model::predict_policies(
 
     int batch = input.num_samples();
 
-    auto& out_tensor = forward(input, temperature, true);
+    auto& out_tensor = forward(input, temperature, nullptr);
     auto src = out_tensor.host();
 
     for (int n=0;n<batch; n++) {
@@ -523,8 +512,9 @@ void zero_model::predict_values(
     }
 
     auto& input = features_to_tensor(begin, end, false);
-    auto& v_tensor = zero_weights_loaded ? zero_net.forward(input) : leela_net.forward(input);
-    auto data = v_tensor.host();
+    const tensor* v_tensor = nullptr;
+    forward(input, 1, &v_tensor);
+    auto data = v_tensor->host();
     for (int n=0;n<batch; n++) {
         (*it++) = data[n];
     }
@@ -541,21 +531,16 @@ void zero_model::predict(
     
     auto& input = features_to_tensor(begin, end, darknet_backend);
     int batch = input.num_samples();
-    auto& out_tensor = forward(input, temperature, false);
+    const tensor* v_tensor = nullptr;
+    auto& out_tensor = forward(input, temperature, &v_tensor);
     auto src = out_tensor.host();
-    auto& v_tensor = zero_weights_loaded ? zero_net.get_output() : leela_net.get_output();
-    auto data = v_tensor.host();
+    auto data = v_tensor->host();
 
     for (int n=0;n<batch; n++) {
         it->first.resize(board_moves);
         std::copy(src, src+board_moves, it->first.begin());
         src += board_moves;
-        if (darknet_backend) {
-            it->second = 0;
-        } else {
-            it->second = data[n];
-        }
-
+        it->second = data[n];
         it++;
     }
 }
