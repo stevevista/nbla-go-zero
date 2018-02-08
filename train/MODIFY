@@ -1,0 +1,11 @@
+nnabla-0.9.7
+1 merge nnabla-ext-cuda
+    no override
+    merge build-tools/code_generator/generator.py
+    merge src/nbla/CMakeLists.txt
+2 chage CMakeLists.txt, 
+    require cmake 2.8
+    ajust source relative path
+    turn off BUILD_PYTHON_PACKAGE
+    remove protocol
+    remvoe python build
