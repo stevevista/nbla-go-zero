@@ -38,13 +38,7 @@
 
 using namespace Utils;
 
-ILeelaModel* Network::model = nullptr;
-
 std::mutex Network::mtx_;
-
-void Network::register_model(ILeelaModel* m) {
-    model = m;
-}
 
 
 // Rotation helper
@@ -121,7 +115,7 @@ Network::Netresult Network::get_scored_moves_internal(
     assert(INPUT_CHANNELS == planes.size());
         
     // Data layout is input_data[(c * height + h) * width + w]
-    InputFeature inputs;
+    NNPlanes inputs;
     for (int c = 0; c < INPUT_CHANNELS; ++c) {
         for (int idx = 0; idx < 361; ++idx) {
             auto rot_idx = rotate_nn_idx_table[rotation][idx];
@@ -132,7 +126,7 @@ Network::Netresult Network::get_scored_moves_internal(
     std::lock_guard<std::mutex> lock(mtx_);
     std::vector<scored_node> result;
  
-    auto out = model->predict(inputs, cfg_softmax_temp);
+    auto out = zero_net->predict(inputs, cfg_softmax_temp);
     float winrate_out = out.second;
     auto outputs = out.first;
 

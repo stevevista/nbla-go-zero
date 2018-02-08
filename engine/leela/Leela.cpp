@@ -69,7 +69,7 @@ void Leela::stop_ponder() {
     Utils::enable_ponder(false);
 }
 
-Leela::Leela(ILeelaModel* m, const std::string& logfile)
+Leela::Leela(const std::string& logfile)
 {
     
     static bool inited = false;
@@ -84,8 +84,6 @@ Leela::Leela(ILeelaModel* m, const std::string& logfile)
     if (!logfile.empty()) {
         cfg_logfile_handle = fopen(logfile.c_str(), "w");
     }
-    
-    Network::register_model(m);
     
     search = std::make_unique<UCTSearch>();
     game = std::make_shared<GameState>();
@@ -319,8 +317,8 @@ void Leela::heatmap(int rotation) const {
 }
 
 
-PolicyPlayer::PolicyPlayer(ILeelaModel* model, const std::string& logfile)
-:Leela(model, logfile)
+PolicyPlayer::PolicyPlayer(const std::string& logfile)
+:Leela(logfile)
 {}
 
 std::string PolicyPlayer::name()

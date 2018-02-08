@@ -145,12 +145,6 @@ namespace dlib
             const static int value = row_matrix;
         };
 
-        template <typename T, long NR, long NC, typename MM, typename L>
-        struct matrix_type_id<matrix_op<op_subm<matrix<T,NR,NC,MM,L> > > >
-        {
-            const static int value = general_matrix;
-        };
-
         template < typename T >
         struct matrix_type_id<matrix_op<op_pointer_to_col_vect<T> > >
         { const static int value = column_matrix; };
@@ -671,29 +665,6 @@ namespace dlib
     // ------------------------------------------------------------------------------------
 
         template <
-            typename T, long NR, long NC, typename MM, typename L,
-            typename src_exp 
-            >
-        void matrix_assign_blas (
-            assignable_sub_matrix<T,NR,NC,MM,L>& dest,
-            const src_exp& src
-        )
-        {
-            if (src.aliases(dest.m))
-            {
-                matrix<T,NR,NC,MM,L> temp(dest.nr(),dest.nc());
-                matrix_assign_blas_proxy(temp,src,1,false, false);
-                matrix_assign_default(dest,temp);
-            }
-            else
-            {
-                matrix_assign_blas_proxy(dest,src,1,false, false);
-            }
-        }
-            
-    // ------------------------------------------------------------------------------------
-
-        template <
             typename T,
             typename src_exp 
             >
@@ -705,52 +676,6 @@ namespace dlib
             if (src.aliases(mat(dest.ptr,dest.height,dest.width)))
             {
                 matrix<T> temp(dest.nr(),dest.nc());
-                matrix_assign_blas_proxy(temp,src,1,false, false);
-                matrix_assign_default(dest,temp);
-            }
-            else
-            {
-                matrix_assign_blas_proxy(dest,src,1,false, false);
-            }
-        }
-            
-    // ------------------------------------------------------------------------------------
-
-        template <
-            typename T, long NR, long NC, typename MM, typename L,
-            typename src_exp 
-            >
-        void matrix_assign_blas (
-            assignable_row_matrix<T,NR,NC,MM,L>& dest,
-            const src_exp& src
-        )
-        {
-            if (src.aliases(dest.m))
-            {
-                matrix<T,NR,NC,MM,L> temp(dest.nr(),dest.nc());
-                matrix_assign_blas_proxy(temp,src,1,false, false);
-                matrix_assign_default(dest,temp);
-            }
-            else
-            {
-                matrix_assign_blas_proxy(dest,src,1,false, false);
-            }
-        }
-            
-    // ------------------------------------------------------------------------------------
-
-        template <
-            typename T, long NR, long NC, typename MM, typename L,
-            typename src_exp 
-            >
-        void matrix_assign_blas (
-            assignable_col_matrix<T,NR,NC,MM,L>& dest,
-            const src_exp& src
-        )
-        {
-            if (src.aliases(dest.m))
-            {
-                matrix<T,NR,NC,MM,L> temp(dest.nr(),dest.nc());
                 matrix_assign_blas_proxy(temp,src,1,false, false);
                 matrix_assign_default(dest,temp);
             }
@@ -862,25 +787,6 @@ namespace dlib
 // ----------------------------------------------------------------------------------------
 
     template <
-        typename T, long NR, long NC, typename MM, typename L,
-        typename src_exp 
-        >
-    inline typename enable_if_c<(is_same_type<T,float>::value ||
-                                is_same_type<T,double>::value ||
-                                is_same_type<T,std::complex<float> >::value ||
-                                is_same_type<T,std::complex<double> >::value) &&
-                                blas_bindings::has_matrix_multiply<src_exp>::value
-    >::type matrix_assign_big (
-        assignable_sub_matrix<T,NR,NC,MM,L>& dest,
-        const src_exp& src
-    )
-    {
-        blas_bindings::matrix_assign_blas(dest,src);
-    }
-
-// ----------------------------------------------------------------------------------------
-
-    template <
         typename T, 
         typename src_exp 
         >
@@ -891,44 +797,6 @@ namespace dlib
                                 blas_bindings::has_matrix_multiply<src_exp>::value
     >::type matrix_assign_big (
         assignable_ptr_matrix<T>& dest,
-        const src_exp& src
-    )
-    {
-        blas_bindings::matrix_assign_blas(dest,src);
-    }
-
-// ----------------------------------------------------------------------------------------
-
-    template <
-        typename T, long NR, long NC, typename MM, typename L,
-        typename src_exp 
-        >
-    inline typename enable_if_c<(is_same_type<T,float>::value ||
-                                is_same_type<T,double>::value ||
-                                is_same_type<T,std::complex<float> >::value ||
-                                is_same_type<T,std::complex<double> >::value) &&
-                                blas_bindings::has_matrix_multiply<src_exp>::value
-    >::type matrix_assign_big (
-        assignable_row_matrix<T,NR,NC,MM,L>& dest,
-        const src_exp& src
-    )
-    {
-        blas_bindings::matrix_assign_blas(dest,src);
-    }
-
-// ----------------------------------------------------------------------------------------
-
-    template <
-        typename T, long NR, long NC, typename MM, typename L,
-        typename src_exp 
-        >
-    inline typename enable_if_c<(is_same_type<T,float>::value ||
-                                is_same_type<T,double>::value ||
-                                is_same_type<T,std::complex<float> >::value ||
-                                is_same_type<T,std::complex<double> >::value) &&
-                                blas_bindings::has_matrix_multiply<src_exp>::value
-    >::type matrix_assign_big (
-        assignable_col_matrix<T,NR,NC,MM,L>& dest,
         const src_exp& src
     )
     {

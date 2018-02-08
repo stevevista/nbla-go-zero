@@ -7,7 +7,6 @@
 
 #include "cpu_dlib.h"
 #include "tensor_tools.h"
-#include "../rectangle.h"
 
 namespace dlib
 {
@@ -290,7 +289,7 @@ namespace dlib
         )
         {
             const auto d = data.host() + data.k()*data.nr()*data.nc()*n;
-            const rectangle boundary = get_rect(data);
+            const long width = data.nc(), height = data.nr();
 
             const long out_nr = 1+(data.nr()+2*padding_y-filter_nr)/stride_y;
             const long out_nc = 1+(data.nc()+2*padding_x-filter_nc)/stride_x;
@@ -317,10 +316,11 @@ namespace dlib
                                 DLIB_ASSERT(cnt < output.size());
                                 long xx = c+x;
                                 long yy = r+y;
-                                if (boundary.contains(xx,yy))
-                                    *t = d[(k*data.nr() + yy)*data.nc() + xx];
-                                else
+                                if (xx < 0 || xx >= width || yy < 0 || yy >= height)
                                     *t = 0;
+                                else
+                                    *t = d[(k*data.nr() + yy)*data.nc() + xx];
+                                    
                                 ++t;
                                 ++cnt;
                             }

@@ -37,7 +37,5 @@ void ValueNet(
 		int sym_idx = 0);
 
 
-void register_aq_predict(IPreditModel* m);
-
 extern int cfg_sym_idx;
 

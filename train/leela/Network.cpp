@@ -41,11 +41,11 @@
 using namespace Utils;
 
 
-static std::shared_ptr<dlib::zero_model> model;
+static std::shared_ptr<lightmodel::zero_model> model;
 
 bool Network::load_weights(const std::string& path) {
     if (!model)
-        model = std::make_shared<dlib::zero_model>();
+        model = std::make_shared<lightmodel::zero_model>();
     return model->load_weights(path);
 }
 

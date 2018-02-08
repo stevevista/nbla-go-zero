@@ -396,31 +396,6 @@ namespace dlib
         template <typename T, long NR, long NC, typename MM>
         int get_ld (const matrix<T,NR,NC,MM,column_major_layout>& m) { return m.nr(); }
 
-
-        template <typename T, long NR, long NC, typename MM>
-        int get_ld (const matrix_op<op_subm<matrix<T,NR,NC,MM,row_major_layout> > >& m) { return m.op.m.nc(); }
-
-        template <typename T, long NR, long NC, typename MM>
-        int get_ld (const matrix_op<op_subm<matrix<T,NR,NC,MM,column_major_layout> > >& m) { return m.op.m.nr(); }
-
-        template <typename T, long NR, long NC, typename MM>
-        int get_ld (const assignable_sub_matrix<T,NR,NC,MM,row_major_layout>& m) { return m.m.nc(); }
-
-        template <typename T, long NR, long NC, typename MM>
-        int get_ld (const assignable_sub_matrix<T,NR,NC,MM,column_major_layout>& m) { return m.m.nr(); }
-
-        template <typename T, long NR, long NC, typename MM>
-        int get_ld (const assignable_col_matrix<T,NR,NC,MM,row_major_layout>& m) { return m.m.nc(); }
-
-        template <typename T, long NR, long NC, typename MM>
-        int get_ld (const assignable_col_matrix<T,NR,NC,MM,column_major_layout>& m) { return m.m.nr(); }
-
-        template <typename T, long NR, long NC, typename MM>
-        int get_ld (const assignable_row_matrix<T,NR,NC,MM,row_major_layout>& m) { return m.m.nc(); }
-
-        template <typename T, long NR, long NC, typename MM>
-        int get_ld (const assignable_row_matrix<T,NR,NC,MM,column_major_layout>& m) { return m.m.nr(); }
-
         template <typename T>
         int get_ld (const assignable_ptr_matrix<T>& m) { return m.nc(); }
 
@@ -441,43 +416,6 @@ namespace dlib
 
         template <typename T, long NR, long NC, typename MM, typename L>
         int get_inc (const matrix<T,NR,NC,MM,L>& ) { return 1; }
-
-        template <typename T, long NR, long NC, typename MM>
-        int get_inc (const matrix_op<op_subm<matrix<T,NR,NC,MM,row_major_layout> > >& m) 
-        { 
-            // if the sub-view doesn't cover all the columns then it can't have a uniform
-            // layout.
-            if (m.nc() < m.op.m.nc())
-                return 0;
-            else
-                return 1;
-        }
-
-        template <typename T, long NR, long NC, typename MM>
-        int get_inc (const matrix_op<op_subm<matrix<T,NR,NC,MM,column_major_layout> > >& m) 
-        { 
-            if (m.nr() < m.op.m.nr())
-                return 0;
-            else
-                return 1;
-        }
-
-        template <typename T, long NR, long NC, typename MM>
-        int get_inc (const assignable_sub_matrix<T,NR,NC,MM,row_major_layout>& m) 
-        { 
-            if (m.nc() < m.m.nc())
-                return 0;
-            else
-                return 1;
-        }
-        template <typename T, long NR, long NC, typename MM>
-        int get_inc (const assignable_sub_matrix<T,NR,NC,MM,column_major_layout>& m) 
-        {
-            if (m.nr() < m.m.nr())
-                return 0;
-            else
-                return 1;
-        }
 
         template <typename T>
         int get_inc (const assignable_ptr_matrix<T>& ) { return 1; }
@@ -532,32 +470,6 @@ namespace dlib
             return m.op.m.nr();
         }
 
-
-
-        template <typename T, long NR, long NC, typename MM>
-        int get_inc(const assignable_row_matrix<T,NR,NC,MM,row_major_layout>& )
-        {
-            return 1;
-        }
-
-        template <typename T, long NR, long NC, typename MM>
-        int get_inc(const assignable_row_matrix<T,NR,NC,MM,column_major_layout>& m)
-        {
-            return m.m.nr();
-        }
-
-        template <typename T, long NR, long NC, typename MM>
-        int get_inc(const assignable_col_matrix<T,NR,NC,MM,row_major_layout>& m)
-        {
-            return m.m.nc();
-        }
-
-        template <typename T, long NR, long NC, typename MM>
-        int get_inc(const assignable_col_matrix<T,NR,NC,MM,column_major_layout>& )
-        {
-            return 1;
-        }
-
         // --------
 
         template <typename T, long NR, long NC, typename MM, typename L>
@@ -565,9 +477,6 @@ namespace dlib
 
         template <typename T, long NR, long NC, typename MM, typename L>
         T* get_ptr (matrix<T,NR,NC,MM,L>& m) { return &m(0,0); }
-
-        template <typename T, long NR, long NC, typename MM, typename L>
-        const T* get_ptr (const matrix_op<op_subm<matrix<T,NR,NC,MM,L> > >& m) { return &m.op.m(m.op.r_,m.op.c_); }
 
         template <typename T, long NR, long NC, typename MM, typename L>
         const T* get_ptr (const matrix_op<op_colm<matrix<T,NR,NC,MM,L> > >& m) { return &m.op.m(0,m.op.col); }
@@ -580,16 +489,6 @@ namespace dlib
 
         template <typename T, long NR, long NC, typename MM, typename L>
         const T* get_ptr (const matrix_op<op_rowm2<matrix<T,NR,NC,MM,L> > >& m) { return &m.op.m(m.op.row,0); }
-
-
-        template <typename T, long NR, long NC, typename MM, typename L>
-        T* get_ptr (assignable_col_matrix<T,NR,NC,MM,L>& m) { return &m(0,0); }
-
-        template <typename T, long NR, long NC, typename MM, typename L>
-        T* get_ptr (assignable_row_matrix<T,NR,NC,MM,L>& m) { return &m(0,0); }
-
-        template <typename T, long NR, long NC, typename MM, typename L>
-        T* get_ptr (assignable_sub_matrix<T,NR,NC,MM,L>& m) { return &m(0,0); }
 
         template <typename T>
         T* get_ptr (assignable_ptr_matrix<T>& m) { return m.ptr; }

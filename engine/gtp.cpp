@@ -8,6 +8,9 @@
 #include <cctype>
 #include "leela/Utils.h"
 #include "aq/board_config.h"
+#include "leela/Leela.h"
+#include "aq/aq.h"
+#include "nn.h"
 
 using namespace Utils;
 
@@ -502,3 +505,32 @@ void play_matchs(const std::string& sgffile, IGtpAgent* player1, IGtpAgent* play
     
     std::cerr << "final score: " << result << std::endl;
 }
+
+
+
+////////////////////////////////////////////////////////////
+
+std::shared_ptr<lightmodel::zero_model> zero_net;
+
+
+bool load_model_weights(const std::string& model_weights) {
+    if (!zero_net)
+        zero_net = std::make_shared<lightmodel::zero_model>();
+    return zero_net->load_weights(model_weights);
+}
+
+
+std::shared_ptr<IGtpAgent> create_agent(const std::string& type, const std::string& model_weights, const std::string& arg0, const std::string& arg1) {
+
+	if (!load_model_weights(model_weights)) {
+		throw std::runtime_error("load weights fail");
+	}
+
+	if (type == "aq")
+		return std::make_shared<AQ>(arg0);
+	else if (type == "policy")
+		return std::make_shared<PolicyPlayer>(arg0);
+	else
+		return std::make_shared<Leela>(arg0);
+}
+

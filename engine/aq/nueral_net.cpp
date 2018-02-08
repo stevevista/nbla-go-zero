@@ -10,14 +10,6 @@ int cfg_sym_idx = 0;
 
 constexpr int feature_cnt = 18;
 
-static IPreditModel* zero_net = nullptr;
-
-void register_aq_predict(IPreditModel* m) {
-	zero_net = m;
-}
-
-
-
 FeedTensor::FeedTensor(){
 	Clear();
 }
@@ -81,7 +73,7 @@ void PolicyNet(
 
 	//std::cout << "predict " << ft_cnt << std::endl;
 
-	InputTensor x_eigen;
+	std::vector<lightmodel::zero_model::feature> x_eigen;
 
 	std::vector<int> sym_idxs;
 	if(sym_idx > 7){
@@ -91,7 +83,7 @@ void PolicyNet(
 	}
 
 	for(int i=0;i<ft_cnt;++i){
-		InputFeature feature;
+		lightmodel::zero_model::feature feature;
 		for(int j=0;j<BVCNT;++j){
 			for(int k=0;k<feature_cnt;++k){
 
@@ -104,7 +96,7 @@ void PolicyNet(
 		x_eigen.push_back(feature);
 	}
 
-	auto outputs = zero_net->predict_distribution(x_eigen, temp);
+	auto outputs = zero_net->predict_policy(x_eigen, temp);
 
 	for(int i=0;i<ft_cnt;++i){
 		std::array<double, EBVCNT> prob;
@@ -141,12 +133,12 @@ void ValueNet(
 	eval_list.clear();
 	int ft_cnt = (int)ft_list.size();
 
-	InputTensor x_eigen;
+	std::vector<lightmodel::zero_model::feature> x_eigen;
 
 	int sym_idx_rand = mt_int8(mt_32);
 
 	for(int i=0;i<ft_cnt;++i){
-		InputFeature feature;
+		lightmodel::zero_model::feature feature;
 		for(int j=0;j<BVCNT;++j){
 			for(int k=0;k<feature_cnt;++k){
 				if(sym_idx == 0) feature[k][j] = ft_list[i].feature[k][j];
@@ -158,7 +150,7 @@ void ValueNet(
 	}
 
 
-	auto outputs = zero_net->predict_winrate(x_eigen);
+	auto outputs = zero_net->predict_value(x_eigen);
 
 	for(int i=0;i<ft_cnt;++i){
 		eval_list.push_back((float)outputs[i]);

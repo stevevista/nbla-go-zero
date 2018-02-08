@@ -35,8 +35,7 @@ class UCTNode;
 
 #include "FastState.h"
 #include "GameState.h"
-#include "Interface.h"
-
+#include "../nn.h"
 
 
 class Network {
@@ -44,7 +43,8 @@ public:
     enum Ensemble {
         DIRECT, RANDOM_ROTATION
     };
-    using NNPlanes = InputFeature;
+    using BoardPlane = lightmodel::zero_model::plane;
+    using NNPlanes = lightmodel::zero_model::feature;
     using scored_node = std::pair<float, int>;
     using Netresult = std::pair<std::vector<scored_node>, float>;
 
@@ -59,7 +59,6 @@ public:
     static constexpr auto INPUT_MOVES = 8;
     static constexpr auto INPUT_CHANNELS = 2 * INPUT_MOVES + 2;
 
-    static void register_model(ILeelaModel*);
     static void initialize();
     static void benchmark(const GameState * state, int iterations = 1600);
     static void show_heatmap(const FastState * state, Netresult & netres,
@@ -74,7 +73,6 @@ private:
       const GameState * state, const NNPlanes & planes, int rotation);
     static int rotate_nn_idx(const int vertex, int symmetry);
 
-    static ILeelaModel* model;
     static std::mutex mtx_;
 };
 

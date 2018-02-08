@@ -15,6 +15,8 @@ project (nbla-go-zero C CXX)
   endif()
   
 
-add_subdirectory(engine)
+
 add_subdirectory(lightmodel)
+add_subdirectory(engine)
 add_subdirectory(train)
+

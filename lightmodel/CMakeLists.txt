@@ -33,15 +33,11 @@ mark_as_advanced(CUDNN_INCLUDE_DIR CUDNN_LIBRARY)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
-include_directories(
-../)
 
 file(GLOB SOURCES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} 
   ./*.cpp
   ./dnn/cpu_dlib.cpp
   ./dnn/tensor_tools.cpp)
-
-list(REMOVE_ITEM SOURCES ./game.cpp)
 
 option(DLIB_USE_BLAS "using blas" OFF)
 
@@ -143,16 +139,6 @@ endif()
 
 
 add_library(lightmodel SHARED ${SOURCES})
-target_link_libraries(lightmodel goengine ${NBLA_LINKER_LIBS})
+target_link_libraries(lightmodel ${NBLA_LINKER_LIBS})
 set_property(TARGET lightmodel PROPERTY CXX_STANDARD 11)
 
-
-
-if(MSVC)
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /STACK:10000000")
-endif()
-
-add_executable(game ./game.cpp)
-set_property(TARGET game PROPERTY CXX_STANDARD 11)
-
-target_link_libraries(game lightmodel goengine)

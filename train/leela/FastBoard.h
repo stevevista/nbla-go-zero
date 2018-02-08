@@ -30,6 +30,7 @@
 
 
 
+
 class FastBoard {
     friend class FastState;
     friend class GameState;

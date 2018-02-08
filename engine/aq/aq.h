@@ -11,7 +11,7 @@ class NENG_API AQ : public IGtpAgent {
         Tree tree;
     
     public:
-        AQ(IPreditModel* m, const std::string& cfg_path);
+        AQ(const std::string& cfg_path);
     
         std::string name();
         void clear_board();

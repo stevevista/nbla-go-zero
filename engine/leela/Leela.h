@@ -26,7 +26,6 @@
 #include "GameState.h"
 #include "../gtp.h"
 #include "UCTSearch.h"
-#include "Interface.h"
 
 class NENG_API Leela : public IGtpAgent {
     
@@ -35,7 +34,7 @@ protected:
     std::unique_ptr<UCTSearch> search;
         
 public:
-    Leela(ILeelaModel*, const std::string& logfile);
+    Leela(const std::string& logfile);
     
     std::string name();
     void clear_board();
@@ -64,7 +63,7 @@ public:
 class NENG_API PolicyPlayer : public Leela {
      
 public:
-    PolicyPlayer(ILeelaModel* model, const std::string& logfile);
+    PolicyPlayer(const std::string& logfile);
     
     std::string name();
     int genmove(int player, bool commit);

@@ -3,13 +3,101 @@
 #ifndef DLIB_MATRIx_DEFAULT_MULTIPLY_
 #define DLIB_MATRIx_DEFAULT_MULTIPLY_
 
-#include "../rectangle.h"
+
 #include "matrix.h"
 #include "matrix_utilities.h"
 #include "../enable_if.h"
 
 namespace dlib
 {
+
+
+// ----------------------------------------------------------------------------------------
+    
+    class rectangle
+    {
+    public:
+
+        rectangle (
+            long l_,
+            long t_,
+            long r_,
+            long b_
+        ) :
+            l(l_),
+            t(t_),
+            r(r_),
+            b(b_)
+        {}
+
+        long top (
+        ) const { return t; }
+
+
+        long left (
+        ) const { return l; }
+
+        long right (
+        ) const { return r; }
+
+        long bottom (
+        ) const { return b; }
+       
+        unsigned long width (
+        ) const 
+        { 
+            if (is_empty())
+                return 0;
+            else
+                return r - l + 1; 
+        }
+
+        unsigned long height (
+        ) const 
+        { 
+            if (is_empty())
+                return 0;
+            else
+                return b - t + 1; 
+        }
+
+        bool is_empty (
+        ) const { return (t > b || l > r); }
+
+
+        bool operator== (
+            const rectangle& rect 
+        ) const 
+        {
+            return (l == rect.l) && (t == rect.t) && (r == rect.r) && (b == rect.b);
+        }
+
+        bool operator!= (
+            const rectangle& rect 
+        ) const 
+        {
+            return !(*this == rect);
+        }
+
+        inline bool operator< (const dlib::rectangle& b) const
+        { 
+            if      (left() < b.left()) return true;
+            else if (left() > b.left()) return false;
+            else if (top() < b.top()) return true;
+            else if (top() > b.top()) return false;
+            else if (right() < b.right()) return true;
+            else if (right() > b.right()) return false;
+            else if (bottom() < b.bottom()) return true;
+            else if (bottom() > b.bottom()) return false;
+            else                    return false;
+        }
+
+    private:
+        const long l;
+        const long t;
+        const long r;
+        const long b;   
+    };
 
 // ------------------------------------------------------------------------------------
 
@@ -101,9 +189,6 @@ namespace dlib
                     {
                         // make a rect for the block from rhs 
                         rectangle rhs_block(i, c, std::min(i+bs-1,rhs.nc()-1), std::min(c+bs-1,rhs.nr()-1));
-
-                        // make a target rect in res
-                        rectangle res_block(rhs_block.left(),lhs_block.top(), rhs_block.right(), lhs_block.bottom());
 
                         // This loop is optimized assuming that the data is laid out in 
                         // row major order in memory.

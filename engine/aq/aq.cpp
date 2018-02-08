@@ -68,10 +68,9 @@ void init_aq(const std::string& cfg_path) {
 	ImportProbPtn3x3();
 }
 
-AQ::AQ(IPreditModel* m, const std::string& cfg_path) {
+AQ::AQ(const std::string& cfg_path) {
 	
     init_aq(cfg_path);
-	register_aq_predict(m);
 }
 
 void Gtp::run() {
