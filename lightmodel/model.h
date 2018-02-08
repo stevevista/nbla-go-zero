@@ -41,9 +41,9 @@ template <typename SUBNET>
 using value_head = htan<fc<1, fc<256, relu<bn_conv2d<1, 1, SUBNET>>>>>;
 
 using zero_net_type = 
-                                policy_head<board_moves,
-                                skip1<
                                 value_head<
+                                skip1<
+                                policy_head<board_moves,
                                 tag1<
                                 repeat<RESIDUAL_BLOCKS, ares,
                                 relu<bn_conv2d<RESIDUAL_FILTERS,3,
@@ -63,6 +63,11 @@ using dark_net_type =           softmax<
 
 
 // leela model
+namespace leela {
+
+template <typename SUBNET> 
+using ares  = relu<residual<block, 128, SUBNET>>;   
+
 using leela_net_type = 
                                 value_head<
                                 skip1<
@@ -72,7 +77,9 @@ using leela_net_type =
                                 relu<bn_conv2d<128,3,
                                 input
                                 >>>>>>>;
+}
 
+using leela::leela_net_type;
 
 
 bool load_zero_weights(zero_net_type& net, const std::string& path);
@@ -135,9 +142,39 @@ private:
             double temperature, 
             bool darknet_backend);
 
-    const tensor& forward(const tensor& input, double temperature);
+    const tensor& forward(const tensor& input, double temperature, bool policy_only);
 
-    const tensor& features_to_tensor(std::vector<feature>::const_iterator begin, std::vector<feature>::const_iterator end, bool darknet_backend);
+    template<typename ITER>
+    const tensor& features_to_tensor(
+                ITER begin, 
+                ITER end, 
+                bool darknet_backend) {
+
+        const int batch_size = std::distance(begin, end);
+        cached_input.set_size(batch_size, darknet_backend ? 1 : num_planes, board_size, board_size);
+
+        auto dst = cached_input.host_write_only();
+        for (int n=0; n<batch_size; n++, begin++) {
+                
+            if (cached_input.k() == 1) {
+                for (int i=0; i<board_count; i++) {
+                    if ((*begin)[0][i]) *dst = 1;
+                    else if ((*begin)[8][i]) *dst = -1;
+                    else *dst = 0;
+                    dst++;
+                }
+            } else {
+                for (int c=0; c< num_planes; c++) {
+                    for (int i=0; i<board_count; i++) {
+                        *(dst++) = (float)(*begin)[c][i];
+                    }
+                }
+            }
+        }
+
+        return cached_input;
+    }
+
 
     void suppress_policy(prediction& prob, const feature& ft);
 
@@ -147,6 +184,7 @@ private:
     size_t max_batch_size;
     tensor cached_input;
     bool zero_weights_loaded;
+    bool leela_weights_loaded;
 };
 
 

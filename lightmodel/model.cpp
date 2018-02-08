@@ -60,10 +60,10 @@ bool load_zero_weights(zero_net_type& net, const std::string& path) {
 
     // sort params in stack
     constexpr int block_w_offset = 5;
-    constexpr int value_w_offset = block_w_offset + 19*10;
-    constexpr int policy_w_offset = value_w_offset + 5 + 4;
+    constexpr int policy_w_offset = block_w_offset + 19*10;
+    constexpr int value_w_offset = policy_w_offset + 5 + 2;
 
-    std::vector<param_data> params(policy_w_offset + 5 + 2); 
+    std::vector<param_data> params(value_w_offset + 5 + 4); 
 
     while(true) {
         std::string key;
@@ -229,7 +229,7 @@ static void transpose_matrix(std::vector<float>& transpose, int rows, int cols)
     }
 }
 
-static void process_bn_beta(std::vector<float>& beta, const std::vector<float>& weights rv, const float epsilon = 1e-5) {
+static void process_bn_beta(std::vector<float>& beta, const std::vector<float>& rv, const float epsilon = 1e-5) {
     for(auto i=0; i<beta.size(); i++) {
         beta[i] = beta[i] / std::sqrt(rv[i] + epsilon);
     }
@@ -296,7 +296,7 @@ bool load_leela_weights(leela_net_type& net, const std::string& path) {
 
     auto add_bn_running_var = [&params, &stored_beta, &stored_mean](std::vector<float>& rv) {
 
-        int channels = (int)weights.size();
+        int channels = (int)rv.size();
         auto shape = std::vector<int>{1, channels, 1, 1};
 
         // additional gamma, beta
@@ -399,6 +399,7 @@ bool load_leela_weights(leela_net_type& net, const std::string& path) {
 zero_model::zero_model()
 : max_batch_size(32)
 , zero_weights_loaded(false)
+, leela_weights_loaded(false)
 {}
 
 void zero_model::set_batch_size(size_t size) {
@@ -429,19 +430,35 @@ bool zero_model::load_weights(const std::string& path) {
         zero_weights_loaded = load_zero_weights(zero_net, path);
         return zero_weights_loaded;
     } else if (is_leela_weights) {
-        return load_leela_weights(leela_net, path);
+        leela_weights_loaded = load_leela_weights(leela_net, path);
+        return leela_weights_loaded;
     } else
         return load_dark_weights(dark_net, path);
 }
 
 
-const tensor& zero_model::forward(const tensor& input, double temperature) {
+const tensor& zero_model::forward(const tensor& input, double temperature, bool policy_only) {
+
     if (input.k() == 1) {
         layer<0>(dark_net).layer_details().set_temprature(temperature);
         return dark_net.forward(input);
     } else {
-        layer<0>(zero_net).layer_details().set_temprature(temperature);
-        return zero_net.forward(input);
+        if (zero_weights_loaded) {
+            layer<7>(zero_net).layer_details().set_temprature(temperature);
+        } else {
+            layer<7>(leela_net).layer_details().set_temprature(temperature);
+        }
+
+        if (policy_only) {
+            return zero_weights_loaded ? layer<7>(zero_net).forward(input) : layer<7>(leela_net).forward(input);
+        }
+
+        if (zero_weights_loaded) {
+            zero_net.forward(input);
+            return layer<7>(zero_net).get_output();
+        }
+        leela_net.forward(input);
+        return layer<7>(leela_net).get_output();
     }
 }
 
@@ -476,12 +493,12 @@ void zero_model::predict_policies(
                 double temperature, 
                 bool darknet_backend) {
 
-    darknet_backend = darknet_backend || !zero_weights_loaded;
+    darknet_backend = darknet_backend || (!zero_weights_loaded && !leela_weights_loaded);
     auto& input = features_to_tensor(begin, end, darknet_backend);
 
     int batch = input.num_samples();
 
-    auto& out_tensor = forward(input, temperature);
+    auto& out_tensor = forward(input, temperature, true);
     auto src = out_tensor.host();
 
     for (int n=0;n<batch; n++) {
@@ -498,7 +515,7 @@ void zero_model::predict_values(
                 std::vector<float>::iterator it) {
 
     int batch = std::distance(begin, end);
-    if (!zero_weights_loaded) {
+    if (!zero_weights_loaded && !leela_weights_loaded) {
         for (int n=0;n<batch; n++) {
             (*it++) = 0;
         }
@@ -506,7 +523,7 @@ void zero_model::predict_values(
     }
 
     auto& input = features_to_tensor(begin, end, false);
-    auto& v_tensor = layer<6>(zero_net).forward(input);
+    auto& v_tensor = zero_weights_loaded ? zero_net.forward(input) : leela_net.forward(input);
     auto data = v_tensor.host();
     for (int n=0;n<batch; n++) {
         (*it++) = data[n];
@@ -520,14 +537,13 @@ void zero_model::predict(
                 double temperature, 
                 bool darknet_backend) {
 
-    darknet_backend = darknet_backend || !zero_weights_loaded;
+    darknet_backend = darknet_backend || (!zero_weights_loaded && !leela_weights_loaded);
     
     auto& input = features_to_tensor(begin, end, darknet_backend);
-
     int batch = input.num_samples();
-    auto& out_tensor = forward(input, temperature);
+    auto& out_tensor = forward(input, temperature, false);
     auto src = out_tensor.host();
-    auto& v_tensor = layer<6>(zero_net).get_output();
+    auto& v_tensor = zero_weights_loaded ? zero_net.get_output() : leela_net.get_output();
     auto data = v_tensor.host();
 
     for (int n=0;n<batch; n++) {
@@ -643,38 +659,6 @@ std::vector<zero_model::prediction_ex> zero_model::predict(const std::vector<fea
     }
 
     return out;
-}
-
-
-const tensor& zero_model::features_to_tensor(
-            std::vector<feature>::const_iterator begin, 
-            std::vector<feature>::const_iterator end, 
-            bool darknet_backend) {
-
-    const int batch_size = std::distance(begin, end);
-
-    cached_input.set_size(batch_size, darknet_backend ? 1 : num_planes, board_size, board_size);
-
-    auto dst = cached_input.host_write_only();
-    for (int n=0; n<batch_size; n++, begin++) {
-            
-        if (darknet_backend) {
-            for (int i=0; i<board_count; i++) {
-                if ((*begin)[0][i]) *dst = 1;
-                else if ((*begin)[8][i]) *dst = -1;
-                else *dst = 0;
-                dst++;
-            }
-        } else {
-            for (int c=0; c< num_planes; c++) {
-                for (int i=0; i<board_count; i++) {
-                    *(dst++) = (float)(*begin)[c][i];
-                }
-            }
-        }
-    }
-
-    return cached_input;
 }
 
 
