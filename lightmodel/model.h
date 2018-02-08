@@ -63,47 +63,21 @@ using dark_net_type =           softmax<
 
 
 // leela model
-namespace leela {
-
-constexpr int RESIDUAL_FILTERS = 128;
-constexpr int RESIDUAL_BLOCKS = 6;
-
-template <int N, long kernel, typename SUBNET> using bn_conv2d = affine<con_bias<N,kernel,kernel,1,1,SUBNET>>;
-
-template <int N, typename SUBNET> 
-using block  = bn_conv2d_bias<N,3,relu<bn_conv2d_bias<N,3,SUBNET>>>;
-
-template <template <int,typename> class block, int N, typename SUBNET>
-using residual = add_prev1<block<N,tag1<SUBNET>>>;
-
-template <typename SUBNET> 
-using ares  = relu<residual<block, RESIDUAL_FILTERS, SUBNET>>;
-
-template <int classes, typename SUBNET>
-using policy_head = softmax<fc<classes, relu<bn_conv2d<2, 1, SUBNET>>>>;
-
-template <typename SUBNET>
-using value_head = htan<fc<1, fc<256, relu<bn_conv2d<1, 1, SUBNET>>>>>;
-
 using leela_net_type = 
                                 value_head<
                                 skip1<
                                 policy_head<board_moves,
                                 tag1<
-                                repeat<RESIDUAL_BLOCKS, ares,
-                                relu<bn_conv2d<RESIDUAL_FILTERS,3,
+                                repeat<6, ares,
+                                relu<bn_conv2d<128,3,
                                 input
                                 >>>>>>>;
 
-}
-
-
-using leela::leela_net_type;
 
 
 bool load_zero_weights(zero_net_type& net, const std::string& path);
 bool load_dark_weights(dark_net_type& net, const std::string& path);
-bool load_leela_weights(const std::string& path);
+bool load_leela_weights(leela_net_type& net, const std::string& path);
 
 class zero_model {
 public:
@@ -169,6 +143,7 @@ private:
 
     zero_net_type zero_net;
     dark_net_type dark_net;
+    leela_net_type leela_net;
     size_t max_batch_size;
     tensor cached_input;
     bool zero_weights_loaded;

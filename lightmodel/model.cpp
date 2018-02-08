@@ -229,14 +229,14 @@ static void transpose_matrix(std::vector<float>& transpose, int rows, int cols)
     }
 }
 
-static void process_bn_var(std::vector<float>& weights, const float epsilon = 1e-5) {
-    for(auto&& w : weights) {
-        w = 1.0f / std::sqrt(w + epsilon);
+static void process_bn_beta(std::vector<float>& beta, const std::vector<float>& weights rv, const float epsilon = 1e-5) {
+    for(auto i=0; i<beta.size(); i++) {
+        beta[i] = beta[i] / std::sqrt(rv[i] + epsilon);
     }
 }
 
 
-bool load_leela_weights(const std::string& path) {
+bool load_leela_weights(leela_net_type& net, const std::string& path) {
     std::ifstream ifs(path);
     if (ifs.fail())
         return false;
@@ -291,24 +291,21 @@ bool load_leela_weights(const std::string& path) {
 
     std::vector<param_data> params; 
 
-    auto add_bn_running_mean = [&params](std::vector<float>& weights) {
+    std::vector<float> stored_beta;
+    std::vector<float> stored_mean;
+
+    auto add_bn_running_var = [&params, &stored_beta, &stored_mean](std::vector<float>& rv) {
+
+        int channels = (int)weights.size();
+        auto shape = std::vector<int>{1, channels, 1, 1};
 
         // additional gamma, beta
-        int channels = (int)weights.size();
-        auto shape = std::vector<int>{1, channels, 1, 1};
         auto gamma = std::vector<float> (channels, 1);
-        auto beta = std::vector<float> (channels, 0);
-        // 
+        process_bn_beta(stored_beta, rv);
         params.push_back({shape, gamma});
-        params.push_back({shape, beta});
-        params.push_back({shape, weights});
-    };
-
-    auto add_bn_running_var = [&params](std::vector<float>& weights) {
-
-        int channels = (int)weights.size();
-        auto shape = std::vector<int>{1, channels, 1, 1};
-        params.push_back({shape, weights});
+        params.push_back({shape, stored_beta});
+        params.push_back({shape, stored_mean});
+        params.push_back({shape, rv});
     };
 
     auto add_fc_W = [&params](std::vector<float>& weights, int inputs, int outputs) {
@@ -318,7 +315,7 @@ bool load_leela_weights(const std::string& path) {
     };
 
 
-
+    
     const auto plain_conv_layers = 1 + (residual_blocks * 2);
     auto plain_conv_wts = plain_conv_layers * 4;
     linecount = 0;
@@ -336,9 +333,9 @@ bool load_leela_weights(const std::string& path) {
                 params.push_back({std::vector<int>{channles, insize, 3, 3}, weights});
             } else if (linecount % 4 == 1) {
                 // bias
-                params.push_back({std::vector<int>{channles}, weights});
+                stored_beta = weights;
             } else if (linecount % 4 == 2) {
-                add_bn_running_mean(weights);
+                stored_mean = weights;
             } else if (linecount % 4 == 3) {
                 // var
                 add_bn_running_var(weights);
@@ -347,11 +344,10 @@ bool load_leela_weights(const std::string& path) {
             // policy conv
             params.push_back({std::vector<int>{2, channles, 1, 1}, weights});
         } else if (linecount == plain_conv_wts + 1) {
-            // policy bias
-            params.push_back({std::vector<int>{2}, weights});
+            stored_beta = weights;
             
         } else if (linecount == plain_conv_wts + 2) {
-            add_bn_running_mean(weights);
+            stored_mean = weights;
 
         } else if (linecount == plain_conv_wts + 3) {
             add_bn_running_var(weights);
@@ -368,11 +364,10 @@ bool load_leela_weights(const std::string& path) {
             params.push_back({std::vector<int>{1, channles, 1, 1}, weights});
             
         } else if (linecount == plain_conv_wts + 7) {
-            //conv_val_b = std::move(weights);
-            params.push_back({std::vector<int>{1}, weights});
+            stored_beta = weights;
            
         } else if (linecount == plain_conv_wts + 8) {
-            add_bn_running_mean(weights);
+            stored_mean = weights;
 
         } else if (linecount == plain_conv_wts + 9) {
             add_bn_running_var(weights);
@@ -395,6 +390,8 @@ bool load_leela_weights(const std::string& path) {
         linecount++;
     }
 
+    net.consume_params(params.begin());
+    return true;
 }
 
 //////////////////////////////////////////////////////////
@@ -432,7 +429,7 @@ bool zero_model::load_weights(const std::string& path) {
         zero_weights_loaded = load_zero_weights(zero_net, path);
         return zero_weights_loaded;
     } else if (is_leela_weights) {
-        return load_leela_weights(path);
+        return load_leela_weights(leela_net, path);
     } else
         return load_dark_weights(dark_net, path);
 }

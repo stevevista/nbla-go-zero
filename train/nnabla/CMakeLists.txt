@@ -102,6 +102,7 @@ if(BUILD_CPP_LIB)
       ${CMAKE_CURRENT_SOURCE_DIR}/third_party/cmdline-master)
   endif()
 
+  include_directories(${NBLA_INCLUDE_DIRS};${PROJECT_BINARY_DIR})
 
   find_package(CUDA)
 
@@ -165,7 +166,7 @@ if(BUILD_CPP_LIB)
     include_directories(${NBLA_CUDA_INCLUDE_DIRS})
     message("CUDA libs: ${NBLA_CUDA_LINKER_LIBS}")
     message("CUDA includes: ${NBLA_CUDA_INCLUDE_DIRS}")
-    include(${CMAKE_SOURCE_DIR}/build-tools/cmake/select_compute_arch.cmake)
+    include(${CMAKE_CURRENT_SOURCE_DIR}/build-tools/cmake/select_compute_arch.cmake)
     CUDA_SELECT_NVCC_ARCH_FLAGS(ARCH_FLAGS ${CUDA_SELECT_NVCC_ARCH_ARG})
     message("Arch: ${ARCH_FLAGS}")
     set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS};${ARCH_FLAGS}")
@@ -173,7 +174,7 @@ if(BUILD_CPP_LIB)
     if(MSVC)
       set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS};-Xcompiler /W0")
     else()
-      set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS};-std=c++11")
+      #set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS};-std=c++11")
       set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}; --default-stream per-thread")
     endif()
       
@@ -192,7 +193,7 @@ if(BUILD_CPP_LIB)
     list(APPEND NBLA_LINKER_LIBS ${NBLA_CUDA_LINKER_LIBS})
   endif()
   
-  include_directories(${NBLA_INCLUDE_DIRS};${PROJECT_BINARY_DIR})
+
 
   file(GLOB SOURCES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} 
     src/nbla/*.cpp
@@ -204,12 +205,13 @@ if(BUILD_CPP_LIB)
     src/nbla/computation_graph/*.cpp)
 
   if (CUDA_FOUND)
-    list(APPEND SOURCES
+    file(GLOB CUDA_SOURCES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} 
       src/nbla/cuda/*.cpp 
       src/nbla/cuda/array/*.cpp 
       src/nbla/cuda/cudnn/*.cpp 
       src/nbla/cuda/utils/*.cpp)
-    list(APPEND SOURCES ${CU_OBJECTS})
+
+    list(APPEND SOURCES ${CUDA_SOURCES} ${CU_OBJECTS})
   endif()
   
 

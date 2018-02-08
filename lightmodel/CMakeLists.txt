@@ -1,37 +1,9 @@
 
-# Find cUDNN, NVIDIA Deep Learning core computation library for CUDA.
-# Returns:
-#   CUDNN_INCLUDE_DIRS
-#   CUDNN_LIBRARIES
-
-include(FindPackageHandleStandardArgs)
-
-find_path(CUDNN_INCLUDE_DIR cudnn.h
-    PATHS
-    $ENV{CUDNN_PATH}/include
-    $ENV{CUDA_PATH}/include
-    /usr/local/cuda/include
-    /usr/include
-    )
-
-find_library(CUDNN_LIBRARY cudnn
-    PATHS
-    $ENV{CUDNN_PATH}/lib64
-    $ENV{CUDA_PATH}/lib/x64
-    /usr/local/cuda/lib64
-    /usr/lib/x86_64-linux-gnu
-    )
-
-find_package_handle_standard_args(
-    cuDNN DEFAULT_MSG CUDNN_INCLUDE_DIR CUDNN_LIBRARY)
-
-set(CUDNN_INCLUDE_DIRS ${CUDNN_INCLUDE_DIR})
-set(CUDNN_LIBRARIES ${CUDNN_LIBRARY})
-mark_as_advanced(CUDNN_INCLUDE_DIR CUDNN_LIBRARY)
 
 
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O4 -fPIC -Wall -std=c++11")
 
 
 file(GLOB SOURCES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} 
@@ -60,7 +32,36 @@ if (CUDA_FOUND)
   ####################################################################################################
   # cuDNN
 
-  find_package(cuDNN REQUIRED)
+ # Find cUDNN, NVIDIA Deep Learning core computation library for CUDA.
+  # Returns:
+  #   CUDNN_INCLUDE_DIRS
+  #   CUDNN_LIBRARIES
+
+  include(FindPackageHandleStandardArgs)
+
+  find_path(CUDNN_INCLUDE_DIR cudnn.h
+      PATHS
+      $ENV{CUDNN_PATH}/include
+      $ENV{CUDA_PATH}/include
+      /usr/local/cuda/include
+      /usr/include
+      )
+
+  find_library(CUDNN_LIBRARY cudnn
+      PATHS
+      $ENV{CUDNN_PATH}/lib64
+      $ENV{CUDA_PATH}/lib/x64
+      /usr/local/cuda/lib64
+      /usr/lib/x86_64-linux-gnu
+      )
+
+  find_package_handle_standard_args(
+      cuDNN DEFAULT_MSG CUDNN_INCLUDE_DIR CUDNN_LIBRARY)
+
+  set(CUDNN_INCLUDE_DIRS ${CUDNN_INCLUDE_DIR})
+  set(CUDNN_LIBRARIES ${CUDNN_LIBRARY})
+  mark_as_advanced(CUDNN_INCLUDE_DIR CUDNN_LIBRARY)
+
   # Get CuDNN version
   set(file ${PROJECT_BINARY_DIR}/detect_cudnn_version.cpp)
   file(WRITE ${file} ""
@@ -85,7 +86,7 @@ if (CUDA_FOUND)
   include_directories(${NBLA_CUDA_INCLUDE_DIRS})
   message("CUDA libs: ${NBLA_CUDA_LINKER_LIBS}")
   message("CUDA includes: ${NBLA_CUDA_INCLUDE_DIRS}")
-  include(${CMAKE_SOURCE_DIR}/build-tools/cmake/select_compute_arch.cmake)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/select_compute_arch.cmake)
   CUDA_SELECT_NVCC_ARCH_FLAGS(ARCH_FLAGS ${CUDA_SELECT_NVCC_ARCH_ARG})
   message("Arch: ${ARCH_FLAGS}")
   set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS};${ARCH_FLAGS}")
@@ -93,7 +94,6 @@ if (CUDA_FOUND)
   if(MSVC)
     set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS};-Xcompiler /W0")
   else()
-    set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS};-std=c++11")
     set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}; --default-stream per-thread")
   endif()
 
