@@ -520,17 +520,30 @@ bool load_model_weights(const std::string& model_weights) {
 }
 
 
-std::shared_ptr<IGtpAgent> create_agent(const std::string& type, const std::string& model_weights, const std::string& arg0, const std::string& arg1) {
+std::shared_ptr<IGtpAgent> create_agent(const std::vector<std::string>& args) {
 
-	if (!load_model_weights(model_weights)) {
+	std::string engine_type;
+	std::string model_weights;
+	
+	for (auto i = 0; i < args.size(); i++) { 
+        auto opt = args[i];
+		
+		if (opt == "--engine_type") {
+			engine_type = args[++i];
+		} else if (opt == "--weights") {
+			model_weights = args[++i];
+		}
+	}
+	
+	if (model_weights.size() && !load_model_weights(model_weights)) {
 		throw std::runtime_error("load weights fail");
 	}
 
-	if (type == "aq")
-		return std::make_shared<AQ>(arg0);
-	else if (type == "policy")
-		return std::make_shared<PolicyPlayer>(arg0);
+	if (engine_type == "aq")
+		return std::make_shared<AQ>(args);
+	else if (engine_type == "policy")
+		return std::make_shared<PolicyPlayer>(args);
 	else
-		return std::make_shared<Leela>(arg0);
+		return std::make_shared<Leela>(args);
 }
 

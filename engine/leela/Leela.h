@@ -34,7 +34,8 @@ protected:
     std::unique_ptr<UCTSearch> search;
         
 public:
-    Leela(const std::string& logfile);
+    Leela(const std::vector<std::string>& args);
+	~Leela();
     
     std::string name();
     void clear_board();
@@ -63,7 +64,7 @@ public:
 class PolicyPlayer : public Leela {
      
 public:
-    PolicyPlayer(const std::string& logfile);
+    PolicyPlayer(const std::vector<std::string>& args);
     
     std::string name();
     int genmove(int player, bool commit);

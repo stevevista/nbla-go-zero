@@ -11,7 +11,7 @@ class AQ : public IGtpAgent {
         Tree tree;
     
     public:
-        AQ(const std::string& cfg_path);
+        AQ(const std::vector<std::string>& args);
     
         std::string name();
         void clear_board();

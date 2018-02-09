@@ -23,7 +23,7 @@ struct stone_template {
 };
 
 
-static stone_template stone_files[BoardSpy::max_stone_templates] = {
+static stone_template stone_files[max_stone_templates] = {
 	{ 1, _T("black.bmp") },
 	{ -1, _T("white.bmp") },
 	{ 0, _T("empty.bmp") },
@@ -97,8 +97,7 @@ void BoardSpy::initResource() {
 			break;
 		}
 	}
-	strcat(program_path, "\\data\\nn_config.txt");
-
+	strcat(program_path, "\\data");
 	init(program_path);
 }
 
@@ -304,6 +303,143 @@ bool BoardSpy::scanBoard(int data[], int& lastMove) {
 }
 
 
+
+class IWindowMatcher {
+public:
+	IWindowMatcher(): level_(0) {}
+	virtual ~IWindowMatcher() {}
+	virtual bool is_match(int level, HWND hFound, LPCTSTR class_name, LPCTSTR text, RECT* rect, BOOL* bEndSearch) = 0;
+
+	void increaceLevel() { level_++;  }
+	void decreaceLevel() { level_--; }
+
+	bool match(HWND hFound, LPCTSTR class_name, LPCTSTR text, RECT* rect, BOOL* bEndSearch) {
+		return is_match(level_, hFound, class_name, text, rect, bEndSearch);
+	}
+
+private:
+	int level_;
+};
+
+
+/*
+Handle: 0x000307E2
+Class : #32770
+left: 263
+top: 160
+right: 871
+bottom: 663
+*/
+class GoBoardMatcher : public IWindowMatcher {
+public:
+	HWND hFound;
+	GoBoardMatcher(): hFound(NULL){}
+
+	bool is_match(int level, HWND hFound, LPCTSTR class_name, LPCTSTR text, RECT* rect, BOOL* bEndSearch) {
+
+		*bEndSearch = FALSE;
+
+		if ((rect->right - rect->left < 300) || (rect->bottom - rect->top < 300)) {
+			// too small , cant be
+			return false;
+		}
+
+		if (level == 0) {
+			if (lstrcmp(class_name, _T("#32770")) != 0) {
+				return false;
+			}
+			return true;
+		}
+
+		if (lstrcmp(class_name, _T("#32770")) == 0) {
+
+			if (rect->right - rect->left == 608) {
+				this->hFound = hFound;
+				*bEndSearch = TRUE;
+				return false; // do not continue
+			}
+		}
+		return true;
+	}
+};
+
+static 
+BOOL CALLBACK EnumWindowsProc(HWND hWnd, LPARAM lParam) {
+
+	// Get the list box
+	IWindowMatcher* matcher = (IWindowMatcher*)lParam;
+
+	// Get the window text to insert
+	TCHAR szText[256];
+	TCHAR szClassName[256];
+	GetWindowText(hWnd, szText, 256);
+	GetClassName(hWnd, szClassName, sizeof(szClassName) / sizeof(TCHAR) - 1);
+
+	RECT rect;
+	GetWindowRect(hWnd, &rect);
+
+	if ((rect.right - rect.left < 300) || (rect.bottom - rect.top < 300)) {
+		// too small , cant be
+		return TRUE;
+	}
+
+	
+
+	BOOL bEndSearch;
+	if (!matcher->match(hWnd, szClassName, szText, &rect, &bEndSearch))
+		return !bEndSearch;
+
+	if (bEndSearch)
+		return FALSE;
+
+	// continue
+	matcher->increaceLevel();
+	EnumChildWindows(hWnd, EnumWindowsProc, (LPARAM)lParam);
+	matcher->decreaceLevel();
+	return TRUE;
+}
+
+
+
+HWND LocateTargetHandle() {
+
+	GoBoardMatcher matcher;
+
+	// Make a callback procedure for Windows to use to iterate
+	// through the Window list
+	FARPROC EnumProcInstance = MakeProcInstance((FARPROC)EnumWindowsProc, g_hInst);
+	// Call the EnumWindows function to start the iteration
+	EnumWindows((WNDENUMPROC)EnumProcInstance, (LPARAM)&matcher);
+
+	// Free up the allocated memory handle
+	FreeProcInstance(EnumProcInstance);
+
+	return matcher.hFound;
+}
+
+
+
+bool BoardSpy::routineCheck() {
+
+	if (!IsWindow(hTargetWnd)) {
+
+		if (hTargetWnd) {
+			releaseWindows();
+		}
+
+		HWND hWnd = LocateTargetHandle();
+		if (!IsWindow(hWnd))
+			return false;
+
+		// get a device context for the window
+		if (!setWindow(hWnd))
+			return false;
+	}
+
+
+}
+
+
 bool BoardSpy::detecteBoard() {
 
 	RECT rc;
@@ -435,9 +571,11 @@ bool BoardSpy::setWindowInternal(HWND hwnd) {
 	return true;
 }
 
-void BoardSpy::setWindow(HWND hwnd) {
+bool BoardSpy::setWindow(HWND hwnd) {
 	if (setWindowInternal(hwnd))
-		reAttach();
+		return reAttach();
+	
+	return false;
 }
 
 
@@ -662,32 +800,76 @@ inline void trim(std::string &ss)
 } 
 
 void BoardSinker::init(const std::string& cfg_path) {
-
-	std::string weights_path;
-	auto pos = cfg_path.rfind('\\') + 1;
-	auto base_dir = cfg_path.substr(0, pos);
-	weights_path = base_dir + "leela.weights";
-
-	std::ifstream ifs(cfg_path);
-	std::string str;
-
-	// Read line by line.
-	while (ifs && getline(ifs, str)) {
-		auto eq = str.find("=");
-		if(eq == std::string::npos)
-			continue;
-		
-		auto key = str.substr(0, eq);
-		auto value = str.substr(eq+1);
-		trim(key);
-		trim(value);
-
-		if (key == "weights") weights_path 	= base_dir + value; 
+	
+	std::string weights_path = "not_exists";
+	bool policy_only = false;
+	bool aq_engine = false;
+	
+	HANDLE dir;
+    WIN32_FIND_DATAA file_data;
+	if ((dir = FindFirstFileA((cfg_path + "\\*").c_str(), &file_data)) == INVALID_HANDLE_VALUE) {
+		fatal("No weights found");
+		return;
 	}
+	
+	do {
+        const std::string file_name = file_data.cFileName;
+        const std::string full_path = cfg_path + "\\" + file_name;
+        const bool is_directory = (file_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
 
-	agent = create_agent("aq", weights_path, cfg_path);
-	gtp = std::make_shared<Gtp>(agent.get());
-	gtp->run();
+        if (file_name[0] == '.')
+            continue;
+
+        if (is_directory)
+            continue;
+
+        auto ext = file_name.substr(file_name.rfind(".")+1);
+		if (ext == "weights") {
+			weights_path = full_path;
+			if (file_name == "policy.weights") 
+				policy_only = true;
+			
+		} else if (file_name == "weights.txt") {
+			weights_path = full_path;
+		}
+		
+		if (file_name == "prob_ptn3x3.txt")
+			aq_engine = true;
+
+    } while (FindNextFile(dir, &file_data));
+
+    FindClose(dir);
+	
+	
+	std::vector<std::string> args;
+	args.push_back("--engine_type");
+	if (aq_engine)
+		args.push_back("aq");
+	else if (policy_only)
+		args.push_back("policy");
+	else 
+		args.push_back("leela");
+	
+	args.push_back("--weights");
+	args.push_back(weights_path);
+	
+	args.push_back("--working_dir");
+	args.push_back(cfg_path);
+	
+	for (int i=1; i<__argc; i++) {
+		args.push_back(__argv[i]);
+	}
+	
+	
+	try {
+		agent = create_agent(args);
+		gtp = std::make_shared<Gtp>(agent.get());
+		gtp->run();
+	} catch(std::exception& e) {
+		fatal(e.what());
+		return;
+	}
+	
 	gtp->send_command("isready");
 
 	std::thread([&](){
@@ -765,3 +947,109 @@ void BoardSinker::newGame(int mycolor) {
 void BoardSinker::stopThink() {
 	gtp->stop_thinking();
 }
+
+
+double BoardHandle::compareStoneReginAt(int x, int y, const TemplateResource& res, const BYTE* DIBs, const  BYTE* stone_bits, const BYTE* mask_bits) const {
+
+	auto left = res.stone_size * x;
+	auto top = res.stone_size * y;
+
+	auto bottom = top + res.stone_size;
+	auto right = left + res.stone_size;
+
+	
+	const int biWidthBytes = ((tplBoardSize_ * nDispalyBitsCount_ + 31) & ~31) / 8;
+
+	double total_diff = 0;
+	int counts = 0;
+
+	for (auto i = top; i < bottom; i++)
+	{
+		auto y = res.stone_size * 19 - i - 1;
+		for (int j = left; j < right; j++) {
+
+			auto idx_m = (i - top)*res.stone_size + (j - left);
+			if (!mask_bits[idx_m]) continue;
+
+			counts++;
+			
+			auto idx = y*biWidthBytes + j*nBpp_;
+			auto r = DIBs[idx + 2];
+			auto g = DIBs[idx + 1];
+			auto b = DIBs[idx];
+			
+			auto idx2 = (i - top)*res.stone_size * 3 + (j - left) * 3;
+			auto r2 = stone_bits[idx2];
+			auto g2 = stone_bits[idx2 + 1];
+			auto b2 = stone_bits[idx2 + 2];
+			
+			//total += abs(r - r2) + abs(g - g2) + abs(b - b2);
+			total_diff += colorDiff(r, g, b, r2, g2, b2);
+		}
+	}
+
+	double diff = total_diff / (double)counts;
+	return diff;
+}
+
+
+int BoardHandle::detectStoneType(int x, int y, const TemplateResource& res, const BYTE* DIBs, bool& isLastMove) const {
+
+	isLastMove = false;
+
+	double val[max_stone_templates];
+	for (auto i = 0; i < max_stone_templates; ++i) {
+		val[i] = compareStoneReginAt(x, y, res, DIBs, &res.stoneImages[i][0], &res.stoneMask[0]);
+	}
+
+	double minval = 100000.0;
+	int sel = 0;
+	for (auto i = 0; i < max_stone_templates; ++i) {
+		if (minval > val[i]) { minval = val[i]; sel = stone_files[i].value; }
+	}
+
+	if (sel == 1) {
+		auto val2 = compareStoneReginAt(x, y, res, DIBs, &res.whiteImage[0], &res.lastMoveMask[0]);
+		if (val2 < 110)
+			isLastMove = true;
+	}else if (sel == -1) {
+		auto val2 = compareStoneReginAt(x, y, res, DIBs, &res.blackImage[0], &res.lastMoveMask[0]);
+		if (val2 < 110)
+			isLastMove = true;
+	}
+
+	return sel;
+}
+
+
+bool BoardHandle::scanBoard(const TemplateResource& res, BYTE* DIBs, int data[], int& lastMove) {
+
+	if (!IsWindow(hTargetWnd))
+		return false;
+
+	// copy screen to bitmap
+	if (stoneSize_ != res.stone_size) {
+
+		StretchBlt(hBoardDC_, 0, 0, tplBoardSize_, tplBoardSize_, hTargetDC, offsetX_, offsetY_, stoneSize_ * 19, stoneSize_ * 19, SRCCOPY);
+	}
+	else {
+		BitBlt(hBoardDC_, 0, 0, tplBoardSize_, tplBoardSize_, hTargetDC, offsetX_, offsetY_, SRCCOPY);
+	}
+
+	GetDIBits(hDisplayDC_, hBoardBitmap_, 0, (UINT)tplBoardSize_, DIBs, &boardBitmapInfo_, DIB_RGB_COLORS);
+
+	lastMove = -1;
+
+	for (auto idx = 0; idx < 361; idx++) {
+		bool isLastMove;
+		auto stone = detectStoneType(idx%19, idx/19, res, DIBs, isLastMove);
+		data[idx] = stone;
+
+		if (isLastMove)
+			lastMove = idx;
+	}
+
+	return true;
+}
+
+

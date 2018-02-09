@@ -64,23 +64,50 @@ void init_global_objects() {
     Network::initialize();
 }
 
+Leela::~Leela() {
+    #ifdef _WIN32
+	thread_pool.~ThreadPool();
+    #endif
+}
 
 void Leela::stop_ponder() {
     Utils::enable_ponder(false);
 }
 
-Leela::Leela(const std::string& logfile)
+Leela::Leela(const std::vector<std::string>& args)
 {
-    
-    static bool inited = false;
+	// Set up engine parameters
+    GTP::setup_default_parameters();
+		
+	std::string logfile;
+	for (auto i = 0; i < args.size(); i++) { 
+        auto opt = args[i];
+		
+		if (opt == "--logfile") {
+			logfile = args[++i];
+		} else if (opt == "--threads") {
+			cfg_num_threads = std::stoi(args[++i]);
+		} else if (opt == "--playouts") {
+			cfg_max_playouts = std::stoi(args[++i]);
+		} else if (opt == "--visits") {
+			cfg_max_visits = std::stoi(args[++i]);
+		} else if (opt == "--resignpct") {
+			cfg_resignpct = std::stoi(args[++i]);
+		} else if (opt == "--dumbpass") {
+			cfg_dumbpass = true;
+		} else if (opt == "--noponder") {
+			cfg_allow_pondering = false;
+		}
+	}
+	
+	static bool inited = false;
     if (!inited) {
     
-        // Set up engine parameters
-        GTP::setup_default_parameters();
         init_global_objects();
         inited = true;
     }
 
+	
     if (!logfile.empty()) {
         cfg_logfile_handle = fopen(logfile.c_str(), "w");
     }
@@ -317,8 +344,8 @@ void Leela::heatmap(int rotation) const {
 }
 
 
-PolicyPlayer::PolicyPlayer(const std::string& logfile)
-:Leela(logfile)
+PolicyPlayer::PolicyPlayer(const std::vector<std::string>& args)
+:Leela(args)
 {}
 
 std::string PolicyPlayer::name()

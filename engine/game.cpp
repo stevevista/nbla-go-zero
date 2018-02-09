@@ -58,6 +58,12 @@ void parse_commandline( int argc, char **argv) {
 
 
 
+#if defined (_WIN32)
+#define PATH_SEP '\\'
+#else
+#define PATH_SEP '/'
+#endif
+
 int main(int argc, char *argv[]) {
 
     parse_commandline(argc, argv);
@@ -68,15 +74,19 @@ int main(int argc, char *argv[]) {
     setbuf(stdin, NULL);
 #endif
 
-    std::shared_ptr<IGtpAgent> agent;
-
-    if (opt_model == "aq") {
-        agent = create_agent(opt_model, cfg_weightsfile, cfg_weightsfile);
-    } else {
-        agent = create_agent(opt_model, cfg_weightsfile, cfg_logfile);
-    } 
-
-    
+	std::vector<std::string> args;
+	
+	args.push_back("--engine_type");
+	args.push_back(opt_model);
+	args.push_back("--weights");
+	args.push_back(cfg_weightsfile);
+	
+	auto pos = cfg_weightsfile.rfind(PATH_SEP) + 1;
+	auto working_dir = cfg_weightsfile.substr(0, pos);
+	args.push_back("--working_dir");
+	args.push_back(working_dir);
+	
+    auto agent = create_agent(args);
 	Gtp gtp(agent.get());
 
     gtp.enable_ponder(cfg_ponder);

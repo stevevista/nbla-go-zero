@@ -8,6 +8,7 @@
 #include <thread>
 #include <engine/gtp.h>
 
+ 
 class BoardSinker {
 public:
 	std::function<void()> onGtpReady;
@@ -36,9 +37,50 @@ protected:
 };
 
 
+constexpr int max_stone_templates = 3;
+
+struct TemplateResource {
+
+	int stone_size;
+	std::vector<BYTE> stoneImages[max_stone_templates];
+	std::vector<BYTE> stoneMask;
+	std::vector<BYTE> lastMoveMask;
+	std::vector<BYTE> blackImage;
+	std::vector<BYTE> whiteImage;
+};
+
+class BoardHandle {
+
+	bool detecteBoard(HWND hWnd);
+	bool scanBoard(const TemplateResource& res, BYTE* DIBs, int data[], int& lastMove);
+	double compareStoneReginAt(int x, int y, const TemplateResource& res, const BYTE* DIBs, const  BYTE* stone_bits, const BYTE* mask_bits) const;
+	int detectStoneType(int x, int y, const TemplateResource& res, const BYTE* DIBs, bool& isLastMove) const;
+
+
+	int tplBoardSize_;
+
+		int offsetX_;
+	int offsetY_;
+	int stoneSize_;
+
+	int nDispalyBitsCount_;
+	int nBpp_;
+
+		BITMAPINFO boardBitmapInfo_;
+	std::vector<BYTE> boardDIBs_;
+
+	HDC hDisplayDC_;
+	HBitmap hBoardBitmap_;
+	Hdc hBoardDC_;
+
+	HWND hTargetWnd;
+	HDC hTargetDC;
+	RECT targetRect_;
+
+};
+
 class BoardSpy : public BoardSinker {
 public:
-	static const int max_stone_templates = 3;
 
 	BoardSpy();
 	~BoardSpy();
@@ -51,8 +93,11 @@ public:
 
 	void initResource();
 	bool detecteBoard();
-	void setWindow(HWND hwnd);
+	bool setWindow(HWND hwnd);
 	void placeAt(int x, int y);
+
+
+	bool routineCheck();
 	
 protected:
 	bool initBitmaps();

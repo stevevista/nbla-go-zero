@@ -35,42 +35,35 @@ inline void trim(string &ss)
 } 
 
 
-void init_aq(const std::string& cfg_path) {
+AQ::AQ(const std::vector<std::string>& args) {
+	
+	for (auto i = 0; i < args.size(); i++) { 
+        auto opt = args[i];
 
-	auto pos = cfg_path.rfind(PATH_SEP) + 1;
-	working_dir = cfg_path.substr(0, pos);
-
-
-	std::ifstream ifs(cfg_path);
-	std::string str;
-
-	// Read line by line.
-	while (ifs && getline(ifs, str)) {
-		auto eq = str.find("=");
-		if(eq == std::string::npos)
-			continue;
-		
-		auto key = str.substr(0, eq);
-		auto value = str.substr(eq+1);
-		trim(key);
-		trim(value);
-
-		if (key == "thread_cnt") cfg_thread_cnt 	= std::stoi(value); 
-		else if (key == "main_time") cfg_main_time 	= std::stod(value); 
-		else if (key == "byoyomi") cfg_byoyomi 	= std::stod(value); 
-		else if (key == "need_time_controll") need_time_controll = (value == "true" || value == "on");
-		else if (key == "japanese_rule")  japanese_rule 	= (value == "true" || value == "on");
-		else if (key == "komi")  cfg_komi 		= std::stod(value);
-		else if (key == "never_resign")  never_resign 	= (value == "true" || value == "on");
-	}
-
+		if (opt == "--working_dir") {
+			working_dir = args[++i];
+        } else if (opt == "--thread_cnt") {
+			cfg_thread_cnt = std::stoi(args[++i]);
+        } else if (opt == "--byoyomi") {
+            cfg_byoyomi 	= std::stod(args[++i]); 
+        } else if (opt == "--main_time") {
+            cfg_main_time 	= std::stod(args[++i]); 
+        } else if (opt == "--need_time_controll") {
+			++i;
+            need_time_controll = (args[i] == "true" || args[i] == "on");
+        } else if (opt == "--japanese_rule") {
+            ++i;
+			japanese_rule 	= (args[i] == "true" || args[i] == "on");
+        } else if (opt == "--komi") {
+            cfg_komi 		= std::stod(args[++i]);
+        } else if (opt == "--never_resign") {
+			++i;
+            never_resign 	= (args[i] == "true" || args[i] == "on");
+        }
+    }
+	
 	ImportProbDist();
 	ImportProbPtn3x3();
-}
-
-AQ::AQ(const std::string& cfg_path) {
-	
-    init_aq(cfg_path);
 }
 
 void Gtp::run() {

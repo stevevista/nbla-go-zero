@@ -139,6 +139,5 @@ public:
 NENG_API std::string xy2movetext(int x, int y);
 NENG_API std::pair<int, int> movetext2xy(const std::string& text);
 
-
-NENG_API std::shared_ptr<IGtpAgent> create_agent(const std::string& type, const std::string& model_weights, const std::string& arg0 = "", const std::string& arg1 = "");
+NENG_API std::shared_ptr<IGtpAgent> create_agent(const std::vector<std::string>& args);
 NENG_API bool load_model_weights(const std::string& model_weights);
