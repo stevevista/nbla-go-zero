@@ -12,7 +12,6 @@
 
 #include "../enable_if.h"
 #include "matrix_data_layout.h"
-#include "../algs.h"
 
 namespace dlib
 {

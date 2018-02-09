@@ -8,8 +8,18 @@
 
 #include "dnn/layers.h"
 #include "dnn/core.h"
-#include <bitset>
-#include <array>
+
+// For windows support
+#if defined(_MSC_VER) && !defined(__CUDACC__)
+#ifdef lightmodel_EXPORTS
+#define LMODEL_API __declspec(dllexport)
+#else
+#define LMODEL_API __declspec(dllimport)
+#endif
+#else
+#define LMODEL_API
+#endif
+
 
 namespace lightmodel {
 
@@ -53,7 +63,7 @@ using zero_net_type =
 template <typename SUBNET> 
 using convs  = relu<bn_conv2d<256,3,SUBNET>>;
 
-using dark_net_type =           fc_no_bias<1,
+using dark_net_type =           fc_no_bias<1, // fake value head
                                 softmax<
                                 fc_no_bias<board_moves,
                                 con_bias<1,1,1,1,1,
@@ -89,6 +99,10 @@ bool load_leela_weights(leela_net_type& net, const std::string& path);
 
 template<typename NET>
 inline const tensor& forward(NET& net, const tensor& input, double temperature, const tensor** value_out) {
+
+    if (temperature)
+        layer<7>(net).layer_details().set_temprature(temperature);
+
     if (value_out == nullptr) {
         return layer<7>(net).forward(input);
     }
@@ -99,6 +113,10 @@ inline const tensor& forward(NET& net, const tensor& input, double temperature, 
 
 template<>
 inline const tensor& forward(dark_net_type& net, const tensor& input, double temperature, const tensor** value_out) {
+
+    if (temperature)
+        layer<1>(net).layer_details().set_temprature(temperature);
+
     if (value_out == nullptr) {
         return layer<1>(net).forward(input);
     }
@@ -116,67 +134,160 @@ public:
 
     static constexpr int num_planes = 18;
 
-    using plane = std::bitset<board_count>;
-    using feature = std::array<plane, num_planes>;
     using prediction = std::vector<float>;
     using prediction_ex = std::pair<prediction, float>;
 
-    zero_model();
+    LMODEL_API zero_model();
 
-    bool load_weights(const std::string& path);
-    void set_batch_size(size_t size);
+    LMODEL_API bool load_weights(const std::string& path);
+    LMODEL_API void set_batch_size(size_t size);
 
-    prediction predict_policy(const feature& ft, double temperature = 1, bool suppress_invalid = false, bool darknet_backend = false);
-    float predict_value(const feature& ft);
-    prediction_ex predict(const feature& ft, double temperature = 1, bool suppress_invalid = false, bool darknet_backend = false);
+    template<typename FEATURE>
+    prediction predict_policy(const FEATURE& ft, double temperature = 1, bool suppress_invalid = false) {
 
-    std::vector<prediction> predict_policy(const std::vector<feature>& features, double temperature = 1, 
-                                    bool suppress_invalid = false, 
-                                    bool darknet_backend = false);
+        std::vector<prediction> out(1);
 
-    std::vector<float> predict_value(const std::vector<feature>& features);
+        predict_batch_policies(features_to_tensor(&ft, &ft+1), out.begin(), temperature);
+        if (suppress_invalid)
+            suppress_policy(out[0], ft);
+        return out[0];
+    }
 
+    template<typename FEATURE>
+    prediction_ex predict(const FEATURE& ft, double temperature = 1, bool suppress_invalid = false)  {
+
+        std::vector<prediction_ex> out(1);
+        predict_batch(features_to_tensor(&ft, &ft+1), out.begin(), temperature);
+        if (suppress_invalid)
+            suppress_policy(out[0].first, ft);
+
+        return out[0];
+    }
+
+    template<typename FEATURE>
+    float predict_value(const FEATURE& ft) {
+
+        std::vector<float> out(1);
+        predict_batch_values(features_to_tensor(&ft, &ft+1), out.begin());
+        return out[0];
+    }
+
+
+    template<typename FEATURE>
+    std::vector<prediction> predict_policy(const std::vector<FEATURE>& features, double temperature = 1, 
+                                    bool suppress_invalid = false)  {
+
+        std::vector<prediction> out(features.size());
+
+        auto in_it = features.begin();
+        auto out_it = out.begin();
+        auto count = features.size();
+        while (count > 0) {
+            auto batch_size = std::min(count, max_batch_size);
+            predict_batch_policies(features_to_tensor(in_it, in_it+batch_size), out_it, temperature);
+
+            if (suppress_invalid) {
+                for (int i=0; i<batch_size; i++) {
+                    suppress_policy(*(out_it+i), *(in_it+i));
+                }
+            }
+
+            in_it += batch_size;
+            out_it += batch_size;
+            count -= batch_size;
+        }
+
+        return out;
+    }
+
+    template<typename FEATURE>
     std::vector<prediction_ex> predict(
-                                    const std::vector<feature>& features, double temperature = 1, 
-                                    bool suppress_invalid = false, bool darknet_backend = false);
+                                    const std::vector<FEATURE>& features, double temperature = 1, 
+                                    bool suppress_invalid = false) {
 
-    std::vector<netres> predict_top(const feature& input, int top_n=1, double temperature = 1, bool darknet_backend = false);
+        std::vector<prediction_ex> out(features.size());
+
+        auto in_it = features.begin();
+        auto out_it = out.begin();
+        auto count = features.size();
+        while (count > 0) {
+            auto batch_size = std::min(count, max_batch_size);
+            predict_batch(features_to_tensor(in_it, in_it+batch_size), out_it, temperature);
+
+            if (suppress_invalid) {
+                for (auto i=0; i<batch_size; i++) {
+                    suppress_policy((out_it+i)->first, *(in_it+i));
+                }
+            }
+
+            in_it += batch_size;
+            out_it += batch_size;
+            count -= batch_size;
+        }
+
+        return out;
+    }
+
+    template<typename FEATURE>
+    std::vector<float> predict_value(const std::vector<FEATURE>& features) {
+
+        std::vector<float> out(features.size());
+
+        auto in_it = features.begin();
+        auto out_it = out.begin();
+        auto count = features.size();
+        while (count > 0) {
+            auto batch_size = std::min(count, max_batch_size);
+            predict_batch_values(features_to_tensor(in_it, in_it+batch_size), out_it);
+            in_it += batch_size;
+            out_it += batch_size;
+            count -= batch_size;
+        }
+
+        return out;
+    }
+
+    template<typename FEATURE>
+    std::vector<netres> predict_top(const FEATURE& ft, int top_n=1, double temperature = 1) {
+
+        auto probs = predict_policy(ft, temperature, true);
+
+        std::vector<netres> index(top_n);
+
+        for(auto& e : index) e.index = -1;
+        for(int i = 0; i < probs.size(); ++i) {
+            int curr = i;
+            for(auto& e : index) {
+                if((e.index < 0) || probs[curr] > probs[e.index]) {
+                    int swap = curr;
+                    curr = e.index;
+                    e.index = swap;
+                    e.score = probs[e.index];
+                }
+            }
+        }
+
+        return index;
+    }
 
 private:
+    LMODEL_API void predict_batch(const tensor& input, std::vector<prediction_ex>::iterator it, double temperature);
+    LMODEL_API void predict_batch_policies(const tensor& input, std::vector<prediction>::iterator it, double temperature);
+    LMODEL_API void predict_batch_values(const tensor& input, std::vector<float>::iterator it);
 
-    void predict_policies(
-            std::vector<feature>::const_iterator begin, 
-            std::vector<feature>::const_iterator end, 
-            std::vector<prediction>::iterator it, 
-            double temperature, 
-            bool darknet_backend);
-
-    void predict_values(
-            std::vector<feature>::const_iterator begin, 
-            std::vector<feature>::const_iterator end,
-            std::vector<float>::iterator it);
-
-    void predict(
-            std::vector<feature>::const_iterator begin, 
-            std::vector<feature>::const_iterator end,
-            std::vector<prediction_ex>::iterator it, 
-            double temperature, 
-            bool darknet_backend);
-
-    const tensor& forward(const tensor& input, double temperature, const tensor** value_out);
+    LMODEL_API const tensor& forward(const tensor& input, double temperature, const tensor** value_out);
 
     template<typename ITER>
     const tensor& features_to_tensor(
                 ITER begin, 
-                ITER end, 
-                bool darknet_backend) {
+                ITER end) {
 
         const int batch_size = std::distance(begin, end);
+        bool darknet_backend = (!zero_weights_loaded && !leela_weights_loaded);
         cached_input.set_size(batch_size, darknet_backend ? 1 : num_planes, board_size, board_size);
 
         auto dst = cached_input.host_write_only();
-        for (int n=0; n<batch_size; n++, begin++) {
-                
+        for (; begin != end; begin++) {
             if (cached_input.k() == 1) {
                 for (int i=0; i<board_count; i++) {
                     if ((*begin)[0][i]) *dst = 1;
@@ -197,7 +308,16 @@ private:
     }
 
 
-    void suppress_policy(prediction& prob, const feature& ft);
+    template<typename FEATURE>
+    void suppress_policy(prediction& prob, const FEATURE& ft) {
+
+        auto& b0 = ft[0];
+        auto& b1 = ft[8];
+
+        for (int i=0; i<board_count; i++)
+            if (b0[i] || b1[i])
+                prob[i] = 0;
+    }
 
     zero_net_type zero_net;
     dark_net_type dark_net;

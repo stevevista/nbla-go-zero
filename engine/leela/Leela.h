@@ -27,7 +27,7 @@
 #include "../gtp.h"
 #include "UCTSearch.h"
 
-class NENG_API Leela : public IGtpAgent {
+class Leela : public IGtpAgent {
     
 protected:
     std::shared_ptr<GameState> game;
@@ -60,7 +60,7 @@ public:
     int selfplay(int playouts, const std::string& sgffile, std::function<void(int, int[])> callback);
 };
 
-class NENG_API PolicyPlayer : public Leela {
+class PolicyPlayer : public Leela {
      
 public:
     PolicyPlayer(const std::string& logfile);

@@ -1,6 +1,6 @@
 
 #include "spy.h"
-
+#include <fstream>
 #undef min
 
 //#pragma comment(lib, "nngo.lib")
@@ -685,14 +685,7 @@ void BoardSinker::init(const std::string& cfg_path) {
 		if (key == "weights") weights_path 	= base_dir + value; 
 	}
 
-
-	model = std::unique_ptr<ZeroPredictModel>(new ZeroPredictModel());
-	if (!model->load_weights(weights_path))
-	{
-        fatal(_T("load model weights fail"));
-    }
-
-	agent = std::unique_ptr<AQ>(new AQ(model.get(), cfg_path));
+	agent = create_agent("aq", weights_path, cfg_path);
 	gtp = std::make_shared<Gtp>(agent.get());
 	gtp->run();
 	gtp->send_command("isready");

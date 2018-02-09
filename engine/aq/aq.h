@@ -5,7 +5,7 @@
 #include "nueral_net.h"
 #include "../gtp.h"
 
-class NENG_API AQ : public IGtpAgent {
+class AQ : public IGtpAgent {
     
         Board b;
         Tree tree;

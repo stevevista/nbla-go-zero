@@ -35,7 +35,6 @@ class UCTNode;
 
 #include "FastState.h"
 #include "GameState.h"
-#include "../nn.h"
 
 
 class Network {
@@ -43,8 +42,8 @@ public:
     enum Ensemble {
         DIRECT, RANDOM_ROTATION
     };
-    using BoardPlane = lightmodel::zero_model::plane;
-    using NNPlanes = lightmodel::zero_model::feature;
+    using BoardPlane = std::bitset<361>;
+    using NNPlanes = std::array<BoardPlane, 18>;
     using scored_node = std::pair<float, int>;
     using Netresult = std::pair<std::vector<scored_node>, float>;
 

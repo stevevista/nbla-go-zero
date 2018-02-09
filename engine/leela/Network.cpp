@@ -35,6 +35,7 @@
 #include "GTP.h"
 #include "Utils.h"
 #include "NNCache.h"
+#include "../nn.h"
 
 using namespace Utils;
 

@@ -452,38 +452,7 @@ const tensor& zero_model::forward(const tensor& input, double temperature, const
 }
 
 
-std::vector<zero_model::netres> zero_model::predict_top(const feature& ft, int top_n, double temperature, bool darknet_backend) {
-
-    auto probs = predict_policy(ft, temperature, true, darknet_backend);
-
-    std::vector<netres> index(top_n);
-
-    for(auto& e : index) e.index = -1;
-    for(int i = 0; i < probs.size(); ++i) {
-        int curr = i;
-        for(auto& e : index) {
-            if((e.index < 0) || probs[curr] > probs[e.index]) {
-                int swap = curr;
-                curr = e.index;
-                e.index = swap;
-                e.score = probs[e.index];
-            }
-        }
-    }
-
-    return index;
-}
-
-
-void zero_model::predict_policies(
-                std::vector<feature>::const_iterator begin, 
-                std::vector<feature>::const_iterator end, 
-                std::vector<prediction>::iterator it, 
-                double temperature, 
-                bool darknet_backend) {
-
-    darknet_backend = darknet_backend || (!zero_weights_loaded && !leela_weights_loaded);
-    auto& input = features_to_tensor(begin, end, darknet_backend);
+void zero_model::predict_batch_policies(const tensor& input, std::vector<prediction>::iterator it, double temperature) {
 
     int batch = input.num_samples();
 
@@ -498,38 +467,9 @@ void zero_model::predict_policies(
     }
 }
 
-void zero_model::predict_values(
-                std::vector<feature>::const_iterator begin, 
-                std::vector<feature>::const_iterator end,
-                std::vector<float>::iterator it) {
 
-    int batch = std::distance(begin, end);
-    if (!zero_weights_loaded && !leela_weights_loaded) {
-        for (int n=0;n<batch; n++) {
-            (*it++) = 0;
-        }
-        return;
-    }
+void zero_model::predict_batch(const tensor& input, std::vector<prediction_ex>::iterator it, double temperature) {
 
-    auto& input = features_to_tensor(begin, end, false);
-    const tensor* v_tensor = nullptr;
-    forward(input, 1, &v_tensor);
-    auto data = v_tensor->host();
-    for (int n=0;n<batch; n++) {
-        (*it++) = data[n];
-    }
-}
-
-void zero_model::predict(
-                std::vector<feature>::const_iterator begin, 
-                std::vector<feature>::const_iterator end,
-                std::vector<prediction_ex>::iterator it, 
-                double temperature, 
-                bool darknet_backend) {
-
-    darknet_backend = darknet_backend || (!zero_weights_loaded && !leela_weights_loaded);
-    
-    auto& input = features_to_tensor(begin, end, darknet_backend);
     int batch = input.num_samples();
     const tensor* v_tensor = nullptr;
     auto& out_tensor = forward(input, temperature, &v_tensor);
@@ -545,116 +485,17 @@ void zero_model::predict(
     }
 }
 
-std::vector<float> zero_model::predict_policy(const feature& ft, double temperature, bool suppress_invalid, bool darknet_backend) {
+void zero_model::predict_batch_values(const tensor& input, std::vector<float>::iterator it) {
 
-    std::vector<std::vector<float>> out(1);
-    std::vector<feature> features{ft};
+    int batch = input.num_samples();
+    const tensor* v_tensor = nullptr;
+    forward(input, 1, &v_tensor);
+    auto data = v_tensor->host();
 
-    predict_policies(features.begin(), features.end(), out.begin(), temperature, darknet_backend);
-    if (suppress_invalid)
-        suppress_policy(out[0], ft);
-    return out[0];
-}
-
-std::vector<std::vector<float>> zero_model::predict_policy(const std::vector<feature>& features, double temperature, 
-                                        bool suppress_invalid, bool darknet_backend) {
-
-    std::vector<std::vector<float>> out(features.size());
-
-    auto in_it = features.begin();
-    auto out_it = out.begin();
-    auto count = features.size();
-    while (count > 0) {
-        auto batch_size = std::min(count, max_batch_size);
-        predict_policies(in_it, in_it+batch_size, out_it, temperature, darknet_backend);
-
-        if (suppress_invalid) {
-            for (int i=0; i<batch_size; i++) {
-                suppress_policy(*(out_it+i), *(in_it+i));
-            }
-        }
-
-        in_it += batch_size;
-        out_it += batch_size;
-        count -= batch_size;
+    for (int n=0;n<batch; n++) {
+        (*it++) = data[n];
     }
-
-    return out;
 }
 
-
-float zero_model::predict_value(const feature& ft) {
-
-    std::vector<float> out(1);
-    std::vector<feature> features{ft};
-
-    predict_values(features.begin(), features.end(), out.begin());
-    return out[0];
-}
-
-std::vector<float> zero_model::predict_value(const std::vector<feature>& features) {
-
-    std::vector<float> out(features.size());
-
-    auto in_it = features.begin();
-    auto out_it = out.begin();
-    auto count = features.size();
-    while (count > 0) {
-        auto batch_size = std::min(count, max_batch_size);
-        predict_values(in_it, in_it+batch_size, out_it);
-        in_it += batch_size;
-        out_it += batch_size;
-        count -= batch_size;
-    }
-
-    return out;
-}
-
-zero_model::prediction_ex zero_model::predict(const feature& ft, double temperature, bool suppress_invalid, bool darknet_backend) {
-    std::vector<prediction_ex> out(1);
-    std::vector<feature> features{ft};
-
-    predict(features.begin(), features.end(), out.begin(), temperature, darknet_backend);
-    if (suppress_invalid)
-        suppress_policy(out[0].first, ft);
-
-    return out[0];
-}
-
-std::vector<zero_model::prediction_ex> zero_model::predict(const std::vector<feature>& features, double temperature, bool suppress_invalid, bool darknet_backend) {
-
-    std::vector<prediction_ex> out(features.size());
-
-    auto in_it = features.begin();
-    auto out_it = out.begin();
-    auto count = features.size();
-    while (count > 0) {
-        auto batch_size = std::min(count, max_batch_size);
-        predict(in_it, in_it+batch_size, out_it, temperature, darknet_backend);
-
-        if (suppress_invalid) {
-            for (int i=0; i<batch_size; i++) {
-                suppress_policy((out_it+i)->first, *(in_it+i));
-            }
-        }
-
-        in_it += batch_size;
-        out_it += batch_size;
-        count -= batch_size;
-    }
-
-    return out;
-}
-
-
-void zero_model::suppress_policy(prediction& prob, const feature& ft) {
-
-    auto& b0 = ft[0];
-    auto& b1 = ft[8];
-
-    for (int i=0; i<board_count; i++)
-        if (b0[i] || b1[i])
-            prob[i] = 0;
-}
 
 }

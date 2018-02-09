@@ -4,7 +4,6 @@
 #define DLIB_MATRIx_
 
 #include "matrix_exp.h"
-#include "../algs.h"
 #include "../enable_if.h"
 #include <sstream>
 #include <algorithm>

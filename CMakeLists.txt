@@ -3,7 +3,15 @@ cmake_minimum_required(VERSION 2.8)
 
 project (nbla-go-zero C CXX)
 
-
+  if(MSVC)
+    # Force to always compile with W4
+    if(CMAKE_CXX_FLAGS MATCHES "/W[0-4]")
+      string(REGEX REPLACE "/W[0-4]" "/W0" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+    else()
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W0")
+    endif()
+  endif()
+  
 # Setting output directory naively
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
   if (WIN32)
@@ -18,5 +26,9 @@ project (nbla-go-zero C CXX)
 
 add_subdirectory(lightmodel)
 add_subdirectory(engine)
-add_subdirectory(train)
 
+if (WIN32)
+  add_subdirectory(backface)
+else()
+  add_subdirectory(train)
+endif()

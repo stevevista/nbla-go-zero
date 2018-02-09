@@ -6,7 +6,6 @@
 #include "matrix_op.h"
 #include "matrix_utilities.h"
 #include "matrix.h"
-#include "../algs.h"
 #include <cmath>
 #include <complex>
 #include <limits>

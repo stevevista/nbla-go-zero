@@ -3,7 +3,6 @@
 #ifndef DLIB_MATRIx_EXP_h_
 #define DLIB_MATRIx_EXP_h_
 
-#include "../algs.h"
 #include "matrix_fwd.h"
 #include <iterator>
 

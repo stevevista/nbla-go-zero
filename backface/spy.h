@@ -6,9 +6,7 @@
 #include <deque>
 #include <functional>
 #include <thread>
-#include <engine/aq/aq.h>
-#include <simplemodel/zero_model.hpp>
-
+#include <engine/gtp.h>
 
 class BoardSinker {
 public:
@@ -34,8 +32,7 @@ protected:
 	int steps_;
 
 	std::shared_ptr<Gtp> gtp;
-	std::unique_ptr<ZeroPredictModel> model;
-    std::unique_ptr<IGtpAgent> agent;
+    std::shared_ptr<IGtpAgent> agent;
 };
 
 

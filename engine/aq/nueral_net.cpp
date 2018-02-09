@@ -1,5 +1,5 @@
 #include "nueral_net.h"
-
+#include "../nn.h"
 
 using std::string;
 using std::cerr;
@@ -17,7 +17,7 @@ FeedTensor::FeedTensor(){
 void FeedTensor::Clear(){
 
 	for(auto& i:feature) {
-		i = false;
+		std::fill(i.begin(), i.end(), 1);
 	}
 	color = 0;
 }
@@ -52,9 +52,9 @@ void FeedTensor::Set(Board& b, int nv) {
     }
 
 	if (to_move == 3)
-    	feature[16].set();
+    	std::fill(feature[16].begin(), feature[16].end(), 1);
 	else
-    	feature[17].set();
+    	std::fill(feature[17].begin(), feature[17].end(), 1);
 }
 
 
@@ -73,7 +73,7 @@ void PolicyNet(
 
 	//std::cout << "predict " << ft_cnt << std::endl;
 
-	std::vector<lightmodel::zero_model::feature> x_eigen;
+	std::vector<FeedTensor::Feature> x_eigen;
 
 	std::vector<int> sym_idxs;
 	if(sym_idx > 7){
@@ -83,7 +83,7 @@ void PolicyNet(
 	}
 
 	for(int i=0;i<ft_cnt;++i){
-		lightmodel::zero_model::feature feature;
+		FeedTensor::Feature feature;
 		for(int j=0;j<BVCNT;++j){
 			for(int k=0;k<feature_cnt;++k){
 
@@ -133,12 +133,12 @@ void ValueNet(
 	eval_list.clear();
 	int ft_cnt = (int)ft_list.size();
 
-	std::vector<lightmodel::zero_model::feature> x_eigen;
+	std::vector<FeedTensor::Feature> x_eigen;
 
 	int sym_idx_rand = mt_int8(mt_32);
 
 	for(int i=0;i<ft_cnt;++i){
-		lightmodel::zero_model::feature feature;
+		FeedTensor::Feature feature;
 		for(int j=0;j<BVCNT;++j){
 			for(int k=0;k<feature_cnt;++k){
 				if(sym_idx == 0) feature[k][j] = ft_list[i].feature[k][j];
