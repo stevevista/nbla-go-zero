@@ -51,7 +51,6 @@ struct TemplateResource {
 
 class BoardHandle {
 
-	bool detecteBoard(HWND hWnd);
 	bool scanBoard(const TemplateResource& res, BYTE* DIBs, int data[], int& lastMove);
 	double compareStoneReginAt(int x, int y, const TemplateResource& res, const BYTE* DIBs, const  BYTE* stone_bits, const BYTE* mask_bits) const;
 	int detectStoneType(int x, int y, const TemplateResource& res, const BYTE* DIBs, bool& isLastMove) const;
@@ -92,10 +91,10 @@ public:
 	bool found() const;
 
 	void initResource();
-	bool detecteBoard();
-	bool setWindow(HWND hwnd);
+
 	void placeAt(int x, int y);
 
+	bool bindWindow(HWND hWnd);
 
 	bool routineCheck();
 	
@@ -106,8 +105,9 @@ protected:
 	int detectStone(int move, bool& isLastMove) const;
 	double compareBoardRegionAt(int move, const std::vector<BYTE>& stone, const std::vector<BYTE>& mask) const;
 
+
 protected:
-	bool reAttach();
+	bool attachWindow(HWND hwnd);
 	void releaseWindows();
 
 
@@ -203,25 +203,6 @@ protected:
 	void onClose();
 	void onDestroy();
 	void onDetectInterval();
-
-	long DoMouseMove
-		(
-			UINT message,
-			WPARAM wParam,
-			LPARAM lParam
-			);
-	long DoMouseUp
-		(
-			UINT message,
-			WPARAM wParam,
-			LPARAM lParam
-			);
-
-	long SearchWindow();
-	BOOL CheckWindowValidity(HWND hwndToCheck);
-	long DisplayInfoOnFoundWindow(HWND hwndFoundWindow);
-	BOOL SetFinderToolImage(BOOL bSet);
-
 	void updateStatus();
 
 protected:

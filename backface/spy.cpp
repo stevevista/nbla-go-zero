@@ -303,71 +303,11 @@ bool BoardSpy::scanBoard(int data[], int& lastMove) {
 }
 
 
-
-class IWindowMatcher {
-public:
-	IWindowMatcher(): level_(0) {}
-	virtual ~IWindowMatcher() {}
-	virtual bool is_match(int level, HWND hFound, LPCTSTR class_name, LPCTSTR text, RECT* rect, BOOL* bEndSearch) = 0;
-
-	void increaceLevel() { level_++;  }
-	void decreaceLevel() { level_--; }
-
-	bool match(HWND hFound, LPCTSTR class_name, LPCTSTR text, RECT* rect, BOOL* bEndSearch) {
-		return is_match(level_, hFound, class_name, text, rect, bEndSearch);
-	}
-
-private:
-	int level_;
-};
-
-
-/*
-Handle: 0x000307E2
-Class : #32770
-left: 263
-top: 160
-right: 871
-bottom: 663
-*/
-class GoBoardMatcher : public IWindowMatcher {
-public:
-	HWND hFound;
-	GoBoardMatcher(): hFound(NULL){}
-
-	bool is_match(int level, HWND hFound, LPCTSTR class_name, LPCTSTR text, RECT* rect, BOOL* bEndSearch) {
-
-		*bEndSearch = FALSE;
-
-		if ((rect->right - rect->left < 300) || (rect->bottom - rect->top < 300)) {
-			// too small , cant be
-			return false;
-		}
-
-		if (level == 0) {
-			if (lstrcmp(class_name, _T("#32770")) != 0) {
-				return false;
-			}
-			return true;
-		}
-
-		if (lstrcmp(class_name, _T("#32770")) == 0) {
-
-			if (rect->right - rect->left == 608) {
-				this->hFound = hFound;
-				*bEndSearch = TRUE;
-				return false; // do not continue
-			}
-		}
-		return true;
-	}
-};
-
 static 
 BOOL CALLBACK EnumWindowsProc(HWND hWnd, LPARAM lParam) {
 
 	// Get the list box
-	IWindowMatcher* matcher = (IWindowMatcher*)lParam;
+	BoardSpy* spy = (BoardSpy*)lParam;
 
 	// Get the window text to insert
 	TCHAR szText[256];
@@ -375,72 +315,51 @@ BOOL CALLBACK EnumWindowsProc(HWND hWnd, LPARAM lParam) {
 	GetWindowText(hWnd, szText, 256);
 	GetClassName(hWnd, szClassName, sizeof(szClassName) / sizeof(TCHAR) - 1);
 
-	RECT rect;
-	GetWindowRect(hWnd, &rect);
+	RECT rc;
+	GetWindowRect(hWnd, &rc);
 
-	if ((rect.right - rect.left < 300) || (rect.bottom - rect.top < 300)) {
+	if ((rc.right - rc.left < 300) || (rc.bottom - rc.top < 300)) {
 		// too small , cant be
 		return TRUE;
 	}
 
-	
-
-	BOOL bEndSearch;
-	if (!matcher->match(hWnd, szClassName, szText, &rect, &bEndSearch))
-		return !bEndSearch;
-
-	if (bEndSearch)
+	if (spy->bindWindow(hWnd))
 		return FALSE;
 
 	// continue
-	matcher->increaceLevel();
 	EnumChildWindows(hWnd, EnumWindowsProc, (LPARAM)lParam);
-	matcher->decreaceLevel();
 	return TRUE;
 }
 
 
+bool BoardSpy::bindWindow(HWND hWnd) {
 
-HWND LocateTargetHandle() {
+	if (hTargetWnd) {
+		releaseWindows();
+	}
 
-	GoBoardMatcher matcher;
+	if (!attachWindow(hWnd))
+		return false;
 
-	// Make a callback procedure for Windows to use to iterate
-	// through the Window list
-	FARPROC EnumProcInstance = MakeProcInstance((FARPROC)EnumWindowsProc, g_hInst);
-	// Call the EnumWindows function to start the iteration
-	EnumWindows((WNDENUMPROC)EnumProcInstance, (LPARAM)&matcher);
-
-	// Free up the allocated memory handle
-	FreeProcInstance(EnumProcInstance);
-
-	return matcher.hFound;
+	return true;
 }
-
-
 
 bool BoardSpy::routineCheck() {
 
 	if (!IsWindow(hTargetWnd)) {
 
-		if (hTargetWnd) {
-			releaseWindows();
-		}
+		// Make a callback procedure for Windows to use to iterate
+		// through the Window list
+		FARPROC EnumProcInstance = MakeProcInstance((FARPROC)EnumWindowsProc, g_hInst);
+		// Call the EnumWindows function to start the iteration
+		EnumWindows((WNDENUMPROC)EnumProcInstance, (LPARAM)this);
 
-		HWND hWnd = LocateTargetHandle();
-		if (!IsWindow(hWnd))
-			return false;
+		// Free up the allocated memory handle
+		FreeProcInstance(EnumProcInstance);
 
-		// get a device context for the window
-		if (!setWindow(hWnd))
+		if (!IsWindow(hTargetWnd))
 			return false;
 	}
-
-
-}
-
-
-bool BoardSpy::detecteBoard() {
 
 	RECT rc;
 	if (!GetWindowRect(hTargetWnd, &rc))
@@ -562,7 +481,6 @@ bool BoardSpy::setWindowInternal(HWND hwnd) {
 		hBoardDC_.selectBitmap(hBoardBitmap_);
 	}
 
-
 	if (!findBoard()) {
 		releaseWindows();
 		return false;
@@ -571,11 +489,42 @@ bool BoardSpy::setWindowInternal(HWND hwnd) {
 	return true;
 }
 
-bool BoardSpy::setWindow(HWND hwnd) {
-	if (setWindowInternal(hwnd))
-		return reAttach();
+bool BoardSpy::attachWindow(HWND hwnd) {
+
+	if (!setWindowInternal(hwnd)) {
+		return false;
+	}
 	
-	return false;
+	int curBoard[361];
+	int lastMove;
+	if (!scanBoard(curBoard, lastMove))
+		return false;
+
+	int more_stones = 0;
+	int stone_counts = 0;
+	for (auto idx=0; idx<361; idx++) {
+		if (curBoard[idx] != 0) {
+			stone_counts++;
+			if (board[idx] == 0)
+				more_stones++;
+		}
+	}
+
+	if (more_stones > 1)
+		return false;
+
+	if (stone_counts <= 1) {
+		memset(board, 0, sizeof(board));
+		memset(board_last, 0, sizeof(board));
+		memset(board_age, 0, sizeof(board));
+
+		if (stone_counts == 0) {
+			newGame(1);
+		} else 
+			newGame(-1);
+	}
+
+	return true;
 }
 
 
@@ -591,7 +540,7 @@ bool BoardSpy::findBoard() {
 
 	HBitmap hbitmap;
 	Hdc memDC;
-
+return false;
 	memDC = CreateCompatibleDC(hTargetDC);
 	hbitmap = CreateCompatibleBitmap(hTargetDC, width, height);
 	memDC.selectBitmap(hbitmap);
@@ -599,10 +548,10 @@ bool BoardSpy::findBoard() {
 	// bitblt the window to the bitmap
 	BitBlt(memDC, 0, 0, width, height, hTargetDC, 0, 0, SRCCOPY);
 
-	OpenClipboard(NULL);
-	EmptyClipboard();
-	SetClipboardData(CF_BITMAP, hbitmap);
-	CloseClipboard();
+	//OpenClipboard(NULL);
+	//EmptyClipboard();
+	//SetClipboardData(CF_BITMAP, hbitmap);
+	//CloseClipboard();
 
 	// DIB DATA
 	std::vector<BYTE> dib(width*height*nBpp_);
@@ -699,45 +648,6 @@ bool BoardSpy::findBoard() {
 
 	offsetX_ = col1 - stoneSize_ - (stoneSize_ +1) / 2;
 	offsetY_ = row1 - stoneSize_ - (stoneSize_ +1) / 2;
-
-	return true;
-}
-
-
-bool BoardSpy::reAttach() {
-
-	int curBoard[361];
-	int lastMove;
-	std::vector<int> blacks;
-	std::vector<int> whites;
-	std::vector<int> seq;
-
-	if (!scanBoard(curBoard, lastMove))
-		return false;
-
-	int more_stones = 0;
-	int stone_counts = 0;
-	for (auto idx=0; idx<361; idx++) {
-		if (curBoard[idx] != 0) {
-			stone_counts++;
-			if (board[idx] == 0)
-				more_stones++;
-		}
-	}
-
-	if (more_stones > 1)
-		return false;
-
-	if (stone_counts <= 1) {
-		memset(board, 0, sizeof(board));
-		memset(board_last, 0, sizeof(board));
-		memset(board_age, 0, sizeof(board));
-
-		if (stone_counts == 0) {
-			newGame(1);
-		} else 
-			newGame(-1);
-	}
 
 	return true;
 }
