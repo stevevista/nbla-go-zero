@@ -1,7 +1,11 @@
 
 #include "spy.h"
 #include <fstream>
+#include <set>
 #undef min
+
+
+constexpr int min_hwnd_pixes = 500;
 
 //#pragma comment(lib, "nngo.lib")
 //#pragma comment(lib, "cudnn.lib")
@@ -16,6 +20,13 @@ static double colorDiff(BYTE r, BYTE g, BYTE b, BYTE r2, BYTE g2, BYTE b2) {
 	return sqrt((r - r2)*(r - r2) + (g - g2)*(g - g2) + (b - b2)*(b - b2));
 }
 
+static double square_diff(COLORREF c1, COLORREF c2) {
+	auto r = std::abs(GetRValue(c1)-GetRValue(c2));
+	auto g = std::abs(GetGValue(c1)-GetGValue(c2));
+	auto b = std::abs(GetBValue(c1)-GetBValue(c2));
+	return (255 - r*0.297 - g*0.593 - b*0.11) / 255;
+}
+
 
 struct stone_template {
 	int value;
@@ -25,8 +36,11 @@ struct stone_template {
 
 static stone_template stone_files[max_stone_templates] = {
 	{ 1, _T("black.bmp") },
-	{ -1, _T("white.bmp") },
 	{ 0, _T("empty.bmp") },
+	{ -1, _T("white.bmp") },
+	
+	
+	
 };
 
 static LPCTSTR mask_files[] = {
@@ -36,7 +50,6 @@ static LPCTSTR mask_files[] = {
 
 BoardSpy::BoardSpy() 
 : hTargetWnd(NULL)
-, hTargetDC(NULL)
 {
 	memset(board, 0, sizeof(board));
 }
@@ -71,22 +84,6 @@ void BoardSpy::initResource() {
 
 	nBpp_ = nDispalyBitsCount_ >> 3;
 
-
-	boardBitmapInfo_.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-	boardBitmapInfo_.bmiHeader.biWidth = tplBoardSize_; // targetWidth
-	boardBitmapInfo_.bmiHeader.biHeight = tplBoardSize_; //targetHeight
-	boardBitmapInfo_.bmiHeader.biPlanes = 1;
-	boardBitmapInfo_.bmiHeader.biBitCount = nDispalyBitsCount_;
-	boardBitmapInfo_.bmiHeader.biClrImportant = 0;
-	boardBitmapInfo_.bmiHeader.biClrUsed = 0;
-	boardBitmapInfo_.bmiHeader.biCompression = BI_RGB;
-	boardBitmapInfo_.bmiHeader.biSizeImage = 0;
-	boardBitmapInfo_.bmiHeader.biYPelsPerMeter = 0;
-	boardBitmapInfo_.bmiHeader.biXPelsPerMeter = 0;
-
-	boardDIBs_.resize(tplBoardSize_*tplBoardSize_*nBpp_);
-
-
 	char program_path[1024];
 	HMODULE hModule = GetModuleHandle(NULL);
 	GetModuleFileNameA(hModule, program_path, 1024);
@@ -110,28 +107,26 @@ bool BoardSpy::initBitmaps() {
 	lstrcpy(resdir, g_szLocalPath);
 	lstrcat(resdir, _T("\\res\\"));
 
-	tplStoneSize_ = 0;
+	lstrcpy(path, resdir);
+	lstrcat(path, "black.bmp");
+	int w, h;
+	if (!loadBmpData(path, blackStoneData_, w, h))
+		return false;
+		
+	tplStoneSize_ = w;
 
-	for (auto i = 0; i < max_stone_templates; i++) {
-		lstrcpy(path, resdir);
-		lstrcat(path, stone_files[i].file);
-		int w, h;
-		if (!loadBmpData(path, stoneImages_[i], w, h))
-			return false;
-
-		if (i == 0) {
-			tplStoneSize_ = w;
-		}
-		else {
-			if (tplStoneSize_ != w || tplStoneSize_ != h)
-				return false;
-		}
-	}
+	lstrcpy(path, resdir);
+	lstrcat(path, "white.bmp");
+	if (!loadBmpData(path, whiteStoneData_, w, h))
+		return false;
+	
+	if (tplStoneSize_ != w || tplStoneSize_ != h)
+		return false;
 
 	tplBoardSize_ = tplStoneSize_ * 19;
 
-	blackImage_.resize(tplBoardSize_*tplBoardSize_*3, 0);
-	whiteImage_.resize(tplBoardSize_*tplBoardSize_ * 3, 255);
+	blackImage_.resize(tplStoneSize_*tplStoneSize_*3, 0);
+	whiteImage_.resize(tplStoneSize_*tplStoneSize_ * 3, 255);
 
 	// load stone mask
 	stoneMaskData_.resize(tplStoneSize_*tplStoneSize_);
@@ -199,26 +194,36 @@ int BoardSpy::detectStone(int move, bool& isLastMove) const {
 
 	isLastMove = false;
 
-	double val[max_stone_templates];
-	for (auto i = 0; i < max_stone_templates; ++i) {
-		val[i] = compareBoardRegionAt(move, stoneImages_[i], stoneMaskData_);
+	bool is_black = false, is_white = false;
+	auto bratio = compareBoardRegionAt(move, blackStoneData_, stoneMaskData_);
+	if (bratio > 0.9) {
+		is_black = true;
+	} else {
+		auto wratio = compareBoardRegionAt(move, whiteStoneData_, stoneMaskData_);
+		if (wratio > 0.9) {
+			is_white = true;
+		}
 	}
 
-	double minval = 100000.0;
 	int sel = 0;
-	for (auto i = 0; i < max_stone_templates; ++i) {
-		if (minval > val[i]) { minval = val[i]; sel = stone_files[i].value; }
+
+	if (is_black) {
+		sel = 1;
+		auto ratio = compareBoardRegionAt(move, whiteImage_, lastMoveMaskData_);
+		isLastMove = (ratio > 0.9);
+	} else if (is_white) {
+		sel = -1;
+		auto ratio = compareBoardRegionAt(move, blackImage_, lastMoveMaskData_);
+		isLastMove = (ratio > 0.9);
 	}
 
-	if (sel == 1) {
-		auto val2 = compareBoardRegionAt(move, whiteImage_, lastMoveMaskData_);
-		if (val2 < 110)
-			isLastMove = true;
-	}else if (sel == -1) {
-		auto val2 = compareBoardRegionAt(move, blackImage_, lastMoveMaskData_);
-		if (val2 < 110)
-			isLastMove = true;
-	}
+	//static bool done = false;
+	//char buf[100];
+	//sprintf(buf, "black %d white %d is last %d", is_black, is_white, isLastMove);
+	//if (!done) {
+//		done = true;
+//		fatal(buf);
+//	}
 
 	return sel;
 }
@@ -239,7 +244,7 @@ double BoardSpy::compareBoardRegionAt(int idx, const std::vector<BYTE>& stone, c
 
 
 	int counts = 0;
-	const BYTE* data = &boardDIBs_[0];
+	const BYTE* data = boardDIB_.data();
 	auto pmask = &mask[0];
 
 	const BYTE* pstone = &stone[0];
@@ -264,7 +269,7 @@ double BoardSpy::compareBoardRegionAt(int idx, const std::vector<BYTE>& stone, c
 			auto b2 = pstone[idx2 + 2];
 			
 			//total += abs(r - r2) + abs(g - g2) + abs(b - b2);
-			total += colorDiff(r, g, b, r2, g2, b2);
+			total += square_diff(RGB(r, g, b), RGB(r2, g2, b2));
 		}
 	}
 
@@ -274,22 +279,7 @@ double BoardSpy::compareBoardRegionAt(int idx, const std::vector<BYTE>& stone, c
 
 bool BoardSpy::scanBoard(int data[], int& lastMove) {
 
-	if (!IsWindow(hTargetWnd))
-		return false;
-
-	// copy screen to bitmap
-	if (stoneSize_ != tplStoneSize_) {
-
-		StretchBlt(hBoardDC_, 0, 0, tplBoardSize_, tplBoardSize_, hTargetDC, offsetX_, offsetY_, stoneSize_ * 19, stoneSize_ * 19, SRCCOPY);
-	}
-	else {
-		BitBlt(hBoardDC_, 0, 0, tplBoardSize_, tplBoardSize_, hTargetDC, offsetX_, offsetY_, SRCCOPY);
-	}
-
-	GetDIBits(hDisplayDC_, hBoardBitmap_, 0, (UINT)tplBoardSize_, &boardDIBs_[0], &boardBitmapInfo_, DIB_RGB_COLORS);
-
 	lastMove = -1;
-
 	for (auto idx = 0; idx < 361; idx++) {
 		bool isLastMove;
 		auto stone = detectStone(idx, isLastMove);
@@ -304,44 +294,148 @@ bool BoardSpy::scanBoard(int data[], int& lastMove) {
 
 
 static 
-BOOL CALLBACK EnumWindowsProc(HWND hWnd, LPARAM lParam) {
-
-	// Get the list box
-	BoardSpy* spy = (BoardSpy*)lParam;
-
-	// Get the window text to insert
-	TCHAR szText[256];
-	TCHAR szClassName[256];
-	GetWindowText(hWnd, szText, 256);
-	GetClassName(hWnd, szClassName, sizeof(szClassName) / sizeof(TCHAR) - 1);
+BOOL CALLBACK Level0EnumWindowsProc(HWND hWnd, LPARAM lParam) {
 
 	RECT rc;
 	GetWindowRect(hWnd, &rc);
 
-	if ((rc.right - rc.left < 300) || (rc.bottom - rc.top < 300)) {
+	if ((rc.right - rc.left < min_hwnd_pixes) || (rc.bottom - rc.top < min_hwnd_pixes)) {
 		// too small , cant be
 		return TRUE;
 	}
 
+	// Get the list box
+	BoardSpy* spy = (BoardSpy*)lParam;
 	if (spy->bindWindow(hWnd))
 		return FALSE;
 
-	// continue
-	EnumChildWindows(hWnd, EnumWindowsProc, (LPARAM)lParam);
 	return TRUE;
 }
 
 
-bool BoardSpy::bindWindow(HWND hWnd) {
 
-	if (hTargetWnd) {
-		releaseWindows();
+bool BoardSpy::locateStartPosition(Hdib& hdib, int& startx, int& starty) {
+
+	// skip title bar
+	for (int i=30; i<50; i++) {
+		for (int j=2; j<50; j++) {
+			if (square_diff(hdib.rgb(j,i), RGB(60,60,60)) > 0.98) {
+				startx = j;
+				starty = i;
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+bool BoardSpy::calcBoardPositions(HWND hWnd, int startx, int starty) {
+
+	Hdib hdib;
+	hdib.getFromWnd(hWnd, nDispalyBitsCount_);
+
+	if (startx < 0 || starty < 0) {
+		if (!locateStartPosition(hdib, startx, starty))
+			return false;
 	}
 
-	if (!attachWindow(hWnd))
+	bool found = false;
+	int tx, ty;
+	for (int i=starty; i < 600; i++) {
+		for (int j=startx; j<600; j++) {
+			if (square_diff(hdib.rgb(j,i), RGB(60,60,60)) < 0.8) {
+				found = true;
+				tx = j;
+				ty = i;
+				break;
+			}
+		}
+		if (found)
+			break;
+	}
+
+	if (!found)
 		return false;
 
+	int boardh, boardw;
+	for (int i=ty+1; i<hdib.height(); i++) {
+			if (square_diff(hdib.rgb(tx,i), RGB(60,60,60)) > 0.9) {
+				boardh = i - ty;
+				break;
+			}
+	}
+	
+	for (int i=tx+1; i<hdib.width(); i++) {
+			if (square_diff(hdib.rgb(i,ty), RGB(60,60,60)) > 0.9) {
+				boardw = i - tx;
+				break;
+			}
+	}
+		
+	if (boardh != boardw)
+		return false;
+
+	// create only once
+	if (!hBoardBitmap_) {
+			
+		hBoardDC_ = CreateCompatibleDC(hDisplayDC_);
+		SetStretchBltMode(hBoardDC_, HALFTONE);
+			
+		hBoardBitmap_ = CreateCompatibleBitmap(hDisplayDC_, tplBoardSize_, tplBoardSize_);
+		hBoardDC_.selectBitmap(hBoardBitmap_);
+	}
+	
+	offsetX_ = tx + 1;
+	offsetY_ = ty + 1;
+	stoneSize_ = boardw / 19;
+
+	Hdc hdc;
+	hdc = GetWindowDC(hWnd);
+
+	// copy screen to bitmap
+	if (stoneSize_ != tplStoneSize_) {
+		
+		StretchBlt(hBoardDC_, 0, 0, tplBoardSize_, tplBoardSize_, hdc, offsetX_, offsetY_, stoneSize_ * 19, stoneSize_ * 19, SRCCOPY);
+	}
+	else {
+		BitBlt(hBoardDC_, 0, 0, tplBoardSize_, tplBoardSize_, hdc, offsetX_, offsetY_, SRCCOPY);
+	}
+		
+	boardDIB_.getFromBitmap(hDisplayDC_, nDispalyBitsCount_, hBoardBitmap_, tplBoardSize_, tplBoardSize_);
+	static bool done = false;
+			if (!done) {
+				done = true;
+				boardDIB_.save("test.bmp");
+			}
+
+	error_count_ = 0;
 	return true;
+}
+
+
+
+bool BoardSpy::bindWindow(HWND hWnd) {
+
+	Hdib hdib;
+	int startx, starty;
+	hdib.getFromWnd(hWnd, nDispalyBitsCount_, 50, 50);
+	if (!locateStartPosition(hdib, startx, starty))
+		return false;
+	
+	if (calcBoardPositions(hWnd, startx, starty)) {
+		
+		if (!initialBoard())
+			return false;
+		
+		if (hTargetWnd) {
+			releaseWindows();
+		}
+
+		hTargetWnd = hWnd;
+		return true;
+	}
+
+	return false;
 }
 
 bool BoardSpy::routineCheck() {
@@ -350,7 +444,7 @@ bool BoardSpy::routineCheck() {
 
 		// Make a callback procedure for Windows to use to iterate
 		// through the Window list
-		FARPROC EnumProcInstance = MakeProcInstance((FARPROC)EnumWindowsProc, g_hInst);
+		FARPROC EnumProcInstance = MakeProcInstance((FARPROC)Level0EnumWindowsProc, g_hInst);
 		// Call the EnumWindows function to start the iteration
 		EnumWindows((WNDENUMPROC)EnumProcInstance, (LPARAM)this);
 
@@ -359,35 +453,41 @@ bool BoardSpy::routineCheck() {
 
 		if (!IsWindow(hTargetWnd))
 			return false;
+	} else {
+		if (!calcBoardPositions(hTargetWnd, -1, -1)) {
+			if (error_count_++ > 10) {
+				releaseWindows();
+				return false;
+			}
+			return true;
+		}
 	}
 
 	RECT rc;
 	if (!GetWindowRect(hTargetWnd, &rc))
 		return false;
 
-	if (targetRect_.left != rc.left ||
-		targetRect_.top != rc.top ||
-		targetRect_.right != rc.right ||
-		targetRect_.bottom != rc.bottom) {
-
-		auto hWnd = hTargetWnd;
-
-		for (auto i = 0; i < 100; ++i) {
-			if (!IsWindow(hWnd))
-				return false;
-			if (setWindowInternal(hWnd))
-				break;
-			Sleep(1);
-		}
+	if (lastRect_.left != rc.left ||
+		lastRect_.top != rc.top ||
+		lastRect_.right != rc.right ||
+		lastRect_.bottom != rc.bottom) {
 
 		if (onSizeChanged)
 			onSizeChanged();
 	}
 
+	lastRect_ = rc;
+
 	int curBoard[361];
 	int lastMove;
-	if (!scanBoard(curBoard, lastMove))
-		return false;
+	if (!scanBoard(curBoard, lastMove)) {
+
+		if (error_count_++ > 10) {
+			releaseWindows();
+			return false;
+		}
+		return true;
+	}
 
 	auto thres = THRESH_STONE_EXISTS_INTERVAL;
 
@@ -450,51 +550,12 @@ bool BoardSpy::routineCheck() {
 
 
 void BoardSpy::releaseWindows() {
-
-	if (hTargetDC) {
-		ReleaseDC(hTargetWnd, hTargetDC);
-		hTargetDC = NULL;
-	}
-
 	hTargetWnd = NULL;
 }
 
-bool BoardSpy::setWindowInternal(HWND hwnd) {
 
-	RECT rc;
-	if (!GetWindowRect(hwnd, &rc))
-		return false;
-	auto w = rc.right - rc.left;
-	auto h = rc.bottom - rc.top;
+bool BoardSpy::initialBoard() {
 
-	releaseWindows();
-
-	hTargetWnd = hwnd;
-	hTargetDC = GetWindowDC(hTargetWnd);
-
-	if (!hBoardBitmap_) {
-
-		hBoardDC_ = CreateCompatibleDC(hTargetDC);
-		SetStretchBltMode(hBoardDC_, HALFTONE);
-
-		hBoardBitmap_ = CreateCompatibleBitmap(hTargetDC, tplBoardSize_, tplBoardSize_);
-		hBoardDC_.selectBitmap(hBoardBitmap_);
-	}
-
-	if (!findBoard()) {
-		releaseWindows();
-		return false;
-	}
-
-	return true;
-}
-
-bool BoardSpy::attachWindow(HWND hwnd) {
-
-	if (!setWindowInternal(hwnd)) {
-		return false;
-	}
-	
 	int curBoard[361];
 	int lastMove;
 	if (!scanBoard(curBoard, lastMove))
@@ -510,6 +571,10 @@ bool BoardSpy::attachWindow(HWND hwnd) {
 		}
 	}
 
+	//char buf[1024];
+	//sprintf(buf, "%d", more_stones);
+
+	//fatal(buf);
 	if (more_stones > 1)
 		return false;
 
@@ -526,132 +591,6 @@ bool BoardSpy::attachWindow(HWND hwnd) {
 
 	return true;
 }
-
-
-bool BoardSpy::findBoard() {
-
-	RECT rc;
-	if (!GetWindowRect(hTargetWnd, &rc))
-		return false;
-
-	auto width = rc.right - rc.left;
-	auto height = rc.bottom - rc.top;
-	targetRect_ = rc;
-
-	HBitmap hbitmap;
-	Hdc memDC;
-return false;
-	memDC = CreateCompatibleDC(hTargetDC);
-	hbitmap = CreateCompatibleBitmap(hTargetDC, width, height);
-	memDC.selectBitmap(hbitmap);
-
-	// bitblt the window to the bitmap
-	BitBlt(memDC, 0, 0, width, height, hTargetDC, 0, 0, SRCCOPY);
-
-	//OpenClipboard(NULL);
-	//EmptyClipboard();
-	//SetClipboardData(CF_BITMAP, hbitmap);
-	//CloseClipboard();
-
-	// DIB DATA
-	std::vector<BYTE> dib(width*height*nBpp_);
-	BITMAPINFO binfo;
-	binfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-	binfo.bmiHeader.biWidth = width;
-	binfo.bmiHeader.biHeight = height;
-	binfo.bmiHeader.biPlanes = 1;
-	binfo.bmiHeader.biBitCount = nDispalyBitsCount_;
-	binfo.bmiHeader.biClrImportant = 0;
-	binfo.bmiHeader.biClrUsed = 0;
-	binfo.bmiHeader.biCompression = BI_RGB;
-	binfo.bmiHeader.biSizeImage = 0;
-	binfo.bmiHeader.biYPelsPerMeter = 0;
-	binfo.bmiHeader.biXPelsPerMeter = 0;
-	GetDIBits(hDisplayDC_, hbitmap, 0, (UINT)height, &dib[0], &binfo, DIB_RGB_COLORS);
-
-	auto biWidthBytes = ((width * nDispalyBitsCount_ + 31) & ~31) / 8;
-
-	auto guessSize = std::min(width, height);
-
-	auto findRow = [&](int from) {
-		for (auto _y = from; _y < height; ++_y) {
-			auto y = height - _y - 1;
-			auto blackPixelCount = 0;
-			for (auto x = 0; x < width; ++x) {
-				auto idx = y*biWidthBytes + x*nBpp_;
-				auto r = dib[idx + 2];
-				auto g = dib[idx + 1];
-				auto b = dib[idx];
-
-				auto diff = colorDiff(r, g, b, 0, 0, 0);
-				if (diff < 50.0f) {
-					blackPixelCount++;
-				}
-			}
-			if (blackPixelCount > guessSize / 2) {
-				return _y;
-			}
-		}
-		return -1;
-	};
-
-	auto findCol = [&](int from) {
-		for (auto x = from; x < width; ++x) {
-			auto blackPixelCount = 0;
-			for (auto _y = 0; _y < height; ++_y) {
-				auto y = height - _y - 1;
-				auto idx = y*biWidthBytes + x*nBpp_;
-				auto r = dib[idx + 2];
-				auto g = dib[idx + 1];
-				auto b = dib[idx];
-
-				auto diff = colorDiff(r, g, b, 0, 0, 0);
-				if (diff < 50.0f) {
-					blackPixelCount++;
-				}
-			}
-			if (blackPixelCount > width / 2) {
-				return x;
-			}
-		}
-		return -1;
-	};
-
-	auto row0 = findRow(0);
-	if (row0 < 0)
-		return false;
-
-	auto row1 = findRow(row0+10);
-	if (row1 < 0)
-		return false;
-
-	auto row2 = findRow(row1 + 10);
-	if (row2 < 0)
-		return false;
-
-	auto col0 = findCol(0);
-	if (col0 < 0)
-		return false;
-
-	auto col1 = findCol(col0 + 10);
-	if (col1 < 0)
-		return false;
-
-	auto col2 = findCol(col1 + 10);
-	if (col2 < 0)
-		return false;
-
-	auto size1 = col2 - col1;
-	auto size2 = row2 - row1;
-	stoneSize_ = std::min(size1, size2);
-
-
-	offsetX_ = col1 - stoneSize_ - (stoneSize_ +1) / 2;
-	offsetY_ = row1 - stoneSize_ - (stoneSize_ +1) / 2;
-
-	return true;
-}
-
 
 bool BoardSpy::found() const {
 	return IsWindow(hTargetWnd);
@@ -859,107 +798,6 @@ void BoardSinker::stopThink() {
 }
 
 
-double BoardHandle::compareStoneReginAt(int x, int y, const TemplateResource& res, const BYTE* DIBs, const  BYTE* stone_bits, const BYTE* mask_bits) const {
-
-	auto left = res.stone_size * x;
-	auto top = res.stone_size * y;
-
-	auto bottom = top + res.stone_size;
-	auto right = left + res.stone_size;
-
-	
-	const int biWidthBytes = ((tplBoardSize_ * nDispalyBitsCount_ + 31) & ~31) / 8;
-
-	double total_diff = 0;
-	int counts = 0;
-
-	for (auto i = top; i < bottom; i++)
-	{
-		auto y = res.stone_size * 19 - i - 1;
-		for (int j = left; j < right; j++) {
-
-			auto idx_m = (i - top)*res.stone_size + (j - left);
-			if (!mask_bits[idx_m]) continue;
-
-			counts++;
-			
-			auto idx = y*biWidthBytes + j*nBpp_;
-			auto r = DIBs[idx + 2];
-			auto g = DIBs[idx + 1];
-			auto b = DIBs[idx];
-			
-			auto idx2 = (i - top)*res.stone_size * 3 + (j - left) * 3;
-			auto r2 = stone_bits[idx2];
-			auto g2 = stone_bits[idx2 + 1];
-			auto b2 = stone_bits[idx2 + 2];
-			
-			//total += abs(r - r2) + abs(g - g2) + abs(b - b2);
-			total_diff += colorDiff(r, g, b, r2, g2, b2);
-		}
-	}
-
-	double diff = total_diff / (double)counts;
-	return diff;
-}
 
 
-int BoardHandle::detectStoneType(int x, int y, const TemplateResource& res, const BYTE* DIBs, bool& isLastMove) const {
-
-	isLastMove = false;
-
-	double val[max_stone_templates];
-	for (auto i = 0; i < max_stone_templates; ++i) {
-		val[i] = compareStoneReginAt(x, y, res, DIBs, &res.stoneImages[i][0], &res.stoneMask[0]);
-	}
-
-	double minval = 100000.0;
-	int sel = 0;
-	for (auto i = 0; i < max_stone_templates; ++i) {
-		if (minval > val[i]) { minval = val[i]; sel = stone_files[i].value; }
-	}
-
-	if (sel == 1) {
-		auto val2 = compareStoneReginAt(x, y, res, DIBs, &res.whiteImage[0], &res.lastMoveMask[0]);
-		if (val2 < 110)
-			isLastMove = true;
-	}else if (sel == -1) {
-		auto val2 = compareStoneReginAt(x, y, res, DIBs, &res.blackImage[0], &res.lastMoveMask[0]);
-		if (val2 < 110)
-			isLastMove = true;
-	}
-
-	return sel;
-}
-
-
-bool BoardHandle::scanBoard(const TemplateResource& res, BYTE* DIBs, int data[], int& lastMove) {
-
-	if (!IsWindow(hTargetWnd))
-		return false;
-
-	// copy screen to bitmap
-	if (stoneSize_ != res.stone_size) {
-
-		StretchBlt(hBoardDC_, 0, 0, tplBoardSize_, tplBoardSize_, hTargetDC, offsetX_, offsetY_, stoneSize_ * 19, stoneSize_ * 19, SRCCOPY);
-	}
-	else {
-		BitBlt(hBoardDC_, 0, 0, tplBoardSize_, tplBoardSize_, hTargetDC, offsetX_, offsetY_, SRCCOPY);
-	}
-
-	GetDIBits(hDisplayDC_, hBoardBitmap_, 0, (UINT)tplBoardSize_, DIBs, &boardBitmapInfo_, DIB_RGB_COLORS);
-
-	lastMove = -1;
-
-	for (auto idx = 0; idx < 361; idx++) {
-		bool isLastMove;
-		auto stone = detectStoneType(idx%19, idx/19, res, DIBs, isLastMove);
-		data[idx] = stone;
-
-		if (isLastMove)
-			lastMove = idx;
-	}
-
-	return true;
-}
-
-
+// 902

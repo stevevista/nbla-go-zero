@@ -1,6 +1,10 @@
 #include "spy.h"
 
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_INLINE
+#include "stb/stb_image_write.h"
+
 void fatal(LPCTSTR msg) {
 	MessageBox(NULL, msg, TEXT("spy"),
 		MB_ICONERROR);
@@ -81,4 +85,38 @@ bool loadBmpData(LPCTSTR pszFile, std::vector<BYTE>& img, int& width, int& heigh
 
 	CloseHandle(hf);
 	return true;
+}
+
+
+
+void Hdib::save(const std::string& path) {
+
+	std::vector<char> bytes(w_*h_*3);
+	auto dst = &bytes[0];
+	for (int y=0; y<h_; y++) {
+		for (int x=0; x<w_; x++) {
+			auto c = rgb(x,y);
+			*dst++ = GetRValue(c);
+			*dst++ = GetGValue(c);
+			*dst++ = GetBValue(c);
+		}
+	}
+
+	stbi_write_bmp(path.c_str(), w_, h_, 3, &bytes[0]);
+}
+
+void save_dib(const std::string& path, const BYTE* data, int size, int bw, int bpp) {
+
+	std::vector<char> bytes(size*size*3);
+	auto dst = &bytes[0];
+	for (int y=0; y<size; y++) {
+		for (int x=0; x<size; x++) {
+			auto idx = (size-1-y)*bw + x*bpp;
+			*dst++ = data[idx+2];
+			*dst++ = data[idx+1];
+			*dst++ = data[idx];
+		}
+	}
+	stbi_write_bmp(path.c_str(), size, size, 3, &bytes[0]);
+
 }

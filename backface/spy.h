@@ -49,34 +49,6 @@ struct TemplateResource {
 	std::vector<BYTE> whiteImage;
 };
 
-class BoardHandle {
-
-	bool scanBoard(const TemplateResource& res, BYTE* DIBs, int data[], int& lastMove);
-	double compareStoneReginAt(int x, int y, const TemplateResource& res, const BYTE* DIBs, const  BYTE* stone_bits, const BYTE* mask_bits) const;
-	int detectStoneType(int x, int y, const TemplateResource& res, const BYTE* DIBs, bool& isLastMove) const;
-
-
-	int tplBoardSize_;
-
-		int offsetX_;
-	int offsetY_;
-	int stoneSize_;
-
-	int nDispalyBitsCount_;
-	int nBpp_;
-
-		BITMAPINFO boardBitmapInfo_;
-	std::vector<BYTE> boardDIBs_;
-
-	HDC hDisplayDC_;
-	HBitmap hBoardBitmap_;
-	Hdc hBoardDC_;
-
-	HWND hTargetWnd;
-	HDC hTargetDC;
-	RECT targetRect_;
-
-};
 
 class BoardSpy : public BoardSinker {
 public:
@@ -100,19 +72,22 @@ public:
 	
 protected:
 	bool initBitmaps();
-	bool setWindowInternal(HWND hwnd);
 	bool scanBoard(int data[], int& lastMove); 
 	int detectStone(int move, bool& isLastMove) const;
 	double compareBoardRegionAt(int move, const std::vector<BYTE>& stone, const std::vector<BYTE>& mask) const;
 
+	bool locateStartPosition(Hdib&, int& startx, int& starty);
+	bool calcBoardPositions(HWND hwnd, int startx, int starty);
 
 protected:
-	bool attachWindow(HWND hwnd);
+	bool initialBoard();
 	void releaseWindows();
 
 
+
+
+
 private:
-	bool findBoard();
 
 	int offsetX_;
 	int offsetY_;
@@ -122,6 +97,8 @@ private:
 	int tplBoardSize_;
 
 	std::vector<BYTE> stoneImages_[max_stone_templates];
+	std::vector<BYTE> blackStoneData_;
+	std::vector<BYTE> whiteStoneData_;
 	std::vector<BYTE> stoneMaskData_;
 	std::vector<BYTE> lastMoveMaskData_;
 	std::vector<BYTE> blackImage_;
@@ -138,15 +115,14 @@ private:
 	int nDispalyBitsCount_;
 	int nBpp_;
 
-	BITMAPINFO boardBitmapInfo_;
-	std::vector<BYTE> boardDIBs_;
+	Hdib boardDIB_;
 
 	HBitmap hBoardBitmap_;
 	Hdc hBoardDC_;
 
 	HWND hTargetWnd;
-	HDC hTargetDC;
-	RECT targetRect_;
+	RECT lastRect_;
+	int error_count_;
 };
 
 

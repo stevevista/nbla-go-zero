@@ -141,7 +141,8 @@ INT_PTR CALLBACK Dialog::Proc(UINT uMsg, WPARAM wParam, LPARAM lParam) {
 		WORD wID = LOWORD(wParam);         // item, control, or accelerator identifier 
 
 		if (wID == IDC_BTN_PONDER) {
-			spy.stopThink();
+			spy.routineCheck();
+			//spy.stopThink();
 			return TRUE;
 		}
 
@@ -230,7 +231,7 @@ void Dialog::updateStatus() {
 void Dialog::onDetectInterval() {
 
 	bool r = spy.routineCheck();
-
+	
 	if (r != connected_) {
 		connected_ = r;
 		updateStatus();

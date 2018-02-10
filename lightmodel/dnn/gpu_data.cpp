@@ -12,6 +12,7 @@
 #include "cuda_utils.h"
 #include <cstring>
 #include "../assert.h"
+#include <algorithm>
 
 namespace dlib
 {
