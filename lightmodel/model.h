@@ -8,6 +8,7 @@
 
 #include "dnn/layers.h"
 #include "dnn/core.h"
+#include <bitset>
 
 // For windows support
 #if defined(_MSC_VER) && !defined(__CUDACC__)
@@ -24,6 +25,8 @@
 namespace lightmodel {
 
 using namespace dlib;
+
+using TFEATURE = std::array<std::bitset<361>, 18>;
 
 constexpr int board_size = 19;
 constexpr int board_count = board_size*board_size;
@@ -139,6 +142,11 @@ public:
 
     LMODEL_API zero_model();
 
+    
+prediction_ex predict2(
+    const TFEATURE& features, double temperature, 
+    bool suppress_invalid = false);
+
     LMODEL_API bool load_weights(const std::string& path);
     LMODEL_API void set_batch_size(size_t size);
 
@@ -157,6 +165,7 @@ public:
     prediction_ex predict(const FEATURE& ft, double temperature = 1, bool suppress_invalid = false)  {
 
         std::vector<prediction_ex> out(1);
+        std::cout << "zero w " << this->zero_weights_loaded << std::endl;
         predict_batch(features_to_tensor(&ft, &ft+1), out.begin(), temperature);
         if (suppress_invalid)
             suppress_policy(out[0].first, ft);

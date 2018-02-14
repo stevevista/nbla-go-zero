@@ -1,7 +1,7 @@
 #
 cmake_minimum_required(VERSION 2.8)
 
-project (nbla-go-zero C CXX)
+project (dnn-go C CXX)
 
   if(MSVC)
     # Force to always compile with W4
@@ -24,7 +24,7 @@ project (nbla-go-zero C CXX)
   
 
 
-add_subdirectory(lightmodel)
+add_subdirectory(gomodel)
 add_subdirectory(engine)
 
 if (WIN32)

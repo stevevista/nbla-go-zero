@@ -443,8 +443,12 @@ bool zero_model::load_weights(const std::string& path) {
 const tensor& zero_model::forward(const tensor& input, double temperature, const tensor** value_out) {
 
     if (input.k() == 1) {
+        std::cout << "dark ..." << std::endl;
         return lightmodel::forward(dark_net, input, temperature, value_out);
     } else {
+        if (zero_weights_loaded) {
+            std::cout << "zero ..." << std::endl;
+        }
         return zero_weights_loaded ? 
                 lightmodel::forward(zero_net, input, temperature, value_out) : 
                 lightmodel::forward(leela_net, input, temperature, value_out);
@@ -466,7 +470,6 @@ void zero_model::predict_batch_policies(const tensor& input, std::vector<predict
         it++;
     }
 }
-
 
 void zero_model::predict_batch(const tensor& input, std::vector<prediction_ex>::iterator it, double temperature) {
 
@@ -495,6 +498,43 @@ void zero_model::predict_batch_values(const tensor& input, std::vector<float>::i
     for (int n=0;n<batch; n++) {
         (*it++) = data[n];
     }
+}
+
+
+
+zero_model::prediction_ex zero_model::predict2(
+                                const TFEATURE& ft, double temperature, 
+                                bool suppress_invalid) {
+
+    
+                                    bool darknet_backend = (!zero_weights_loaded && !leela_weights_loaded);
+                                    cached_input.set_size(1, darknet_backend ? 1 : num_planes, board_size, board_size);
+                            
+                                    auto dst = cached_input.host_write_only();
+             
+                                        if (cached_input.k() == 1) {
+                                            for (int i=0; i<board_count; i++) {
+                                                if (ft[0][i]) *dst = 1;
+                                                else if (ft[8][i]) *dst = -1;
+                                                else *dst = 0;
+                                                dst++;
+                                            }
+                                        } else {
+                                            for (int c=0; c< num_planes; c++) {
+                                                for (int i=0; i<board_count; i++) {
+                                                    *(dst++) = (float)ft[c][i];
+                                                }
+                                            }
+                                        }
+                                
+
+                                    std::vector<prediction_ex> out(1);
+                                    std::cout << "zero w " << this->zero_weights_loaded << std::endl;
+                                    predict_batch(cached_input, out.begin(), temperature);
+                                    if (suppress_invalid)
+                                        suppress_policy(out[0].first, ft);
+                            
+                                    return out[0];
 }
 
 

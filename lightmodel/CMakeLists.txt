@@ -1,6 +1,6 @@
 
 
-
+project(lightmodel)
 
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O4 -fPIC -Wall -std=c++11")
@@ -13,7 +13,7 @@ file(GLOB SOURCES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
 
 option(DLIB_USE_BLAS "using blas" OFF)
 
-find_package(CUDA)
+find_package(CUDA 7.5)
 
 if (CUDA_FOUND)
   message("-- CUDA--")
@@ -91,11 +91,11 @@ if (CUDA_FOUND)
   message("Arch: ${ARCH_FLAGS}")
   set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS};${ARCH_FLAGS}")
 
-  if(MSVC)
-    set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS};-Xcompiler /W0")
-  else()
-    set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}; --default-stream per-thread")
-  endif()
+  #if(MSVC)
+  #  set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS};-Xcompiler /W0")
+  #else()
+  #  set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}; --default-stream per-thread")
+  #endif()
 
   cuda_compile(CU_OBJECTS
     ./dnn/cuda_dlib.cu
@@ -138,7 +138,9 @@ if (DLIB_USE_BLAS)
 endif()
 
 
+
 add_library(lightmodel SHARED ${SOURCES})
 target_link_libraries(lightmodel ${NBLA_LINKER_LIBS})
 set_property(TARGET lightmodel PROPERTY CXX_STANDARD 11)
 
+# target_compile_options(lightmodel PUBLIC "-fPIC" "-std=c++11")

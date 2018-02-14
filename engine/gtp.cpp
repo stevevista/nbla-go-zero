@@ -7,9 +7,9 @@
 #include <cstdlib>
 #include <cctype>
 #include "leela/Utils.h"
-#include "aq/board_config.h"
+#include "AQ/board_config.h"
 #include "leela/Leela.h"
-#include "aq/aq.h"
+#include "AQ/aq.h"
 #include "nn.h"
 
 using namespace Utils;
