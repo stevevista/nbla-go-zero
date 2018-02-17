@@ -16,6 +16,7 @@ public:
 	std::function<void()> onResign;
 	std::function<void(int player, int x, int y)> onMovePredict;
 	std::function<void(int player, int x, int y, int steps)> onMoveChange;
+	std::function<void(const std::string&, bool is_rsp)> onGtp;
 
 public:
 	void stopThink();
@@ -27,6 +28,9 @@ protected:
 	void newGame(int mycolor);
 	void commitMove(int player, int x, int y);
 
+	void send_command(const std::string& cmd);
+	void unsolicite(std::string& cmd, std::string& rsp);
+	
 protected:
 	int myTurn_;
 	int turn_;
@@ -38,16 +42,6 @@ protected:
 
 
 constexpr int max_stone_templates = 3;
-
-struct TemplateResource {
-
-	int stone_size;
-	std::vector<BYTE> stoneImages[max_stone_templates];
-	std::vector<BYTE> stoneMask;
-	std::vector<BYTE> lastMoveMask;
-	std::vector<BYTE> blackImage;
-	std::vector<BYTE> whiteImage;
-};
 
 
 class BoardSpy : public BoardSinker {
@@ -73,8 +67,8 @@ public:
 protected:
 	bool initBitmaps();
 	bool scanBoard(int data[], int& lastMove); 
-	int detectStone(int move, bool& isLastMove) const;
-	double compareBoardRegionAt(int move, const std::vector<BYTE>& stone, const std::vector<BYTE>& mask) const;
+	int detectStone(const BYTE* DIBS, int move, bool& isLastMove) const;
+	double compareBoardRegionAt(const BYTE* DIBS, int move, const std::vector<BYTE>& stone, const std::vector<BYTE>& mask) const;
 
 	bool locateStartPosition(Hdib&, int& startx, int& starty);
 	bool calcBoardPositions(HWND hwnd, int startx, int starty);
@@ -96,7 +90,6 @@ private:
 	int tplStoneSize_;
 	int tplBoardSize_;
 
-	std::vector<BYTE> stoneImages_[max_stone_templates];
 	std::vector<BYTE> blackStoneData_;
 	std::vector<BYTE> whiteStoneData_;
 	std::vector<BYTE> stoneMaskData_;

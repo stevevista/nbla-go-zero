@@ -171,10 +171,18 @@ void Dialog::onInit() {
 
 	wndLabel_.create(hWnd_);
 
+	szMoves_[0] = 0;
+	spy.onGtp = [&](const std::string& line, bool is_rsp) {
+		wndLabel_.hide();
+		strcat(szMoves_, line.c_str());
+		strcat(szMoves_, _T("\r\n"));
+		SetDlgItemText(hWnd_, IDC_EDIT_STATUS, szMoves_);
+	};
+
 	spy.onMoveChange = [&](char player, int x, int y, int steps) {
 
 		wndLabel_.hide();
-
+/*
 		TCHAR wbuf[50];
 		wsprintf(wbuf, _T("%d: %s (%d,%d)"), steps, player == 1 ? _T("B") : _T("W"), x, y);
 		if (steps == 1)
@@ -183,7 +191,7 @@ void Dialog::onInit() {
 		lstrcat(szMoves_, wbuf);
 		lstrcat(szMoves_, _T("\r\n"));
 		memcpy(&szMoves_[1], wbuf, lstrlen(wbuf)*sizeof(TCHAR));
-		SetDlgItemText(hWnd_, IDC_EDIT_STATUS, szMoves_);
+		SetDlgItemText(hWnd_, IDC_EDIT_STATUS, szMoves_);*/
 	};
 
 	spy.onSizeChanged = [&]() {
@@ -240,7 +248,7 @@ void Dialog::onDetectInterval() {
 		if (r) {
 			SetTimer(hWnd_,             // handle to main window 
 			IDT_TIMER1,            // timer identifier 
-			10,                 // 10-second interval 
+			50,                 // 10-second interval 
 			(TIMERPROC)NULL);     // no timer callback 
 		} else {
 			SetTimer(hWnd_,             // handle to main window 

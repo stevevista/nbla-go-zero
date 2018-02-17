@@ -6,19 +6,8 @@
 
 
 constexpr int min_hwnd_pixes = 500;
+constexpr int THRESH_STONE_EXISTS_INTERVAL = 10;
 
-//#pragma comment(lib, "nngo.lib")
-//#pragma comment(lib, "cudnn.lib")
-//#pragma comment(lib, "cudart_static.lib")
-
-
-
-const int THRESH_STONE_EXISTS_INTERVAL = 50;
-
-
-static double colorDiff(BYTE r, BYTE g, BYTE b, BYTE r2, BYTE g2, BYTE b2) {
-	return sqrt((r - r2)*(r - r2) + (g - g2)*(g - g2) + (b - b2)*(b - b2));
-}
 
 static double square_diff(COLORREF c1, COLORREF c2) {
 	auto r = std::abs(GetRValue(c1)-GetRValue(c2));
@@ -33,15 +22,6 @@ struct stone_template {
 	LPCTSTR file;
 };
 
-
-static stone_template stone_files[max_stone_templates] = {
-	{ 1, _T("black.bmp") },
-	{ 0, _T("empty.bmp") },
-	{ -1, _T("white.bmp") },
-	
-	
-	
-};
 
 static LPCTSTR mask_files[] = {
 	_T("stone.bmp"),
@@ -190,16 +170,16 @@ bool BoardSpy::initBitmaps() {
 }
 
 
-int BoardSpy::detectStone(int move, bool& isLastMove) const {
+int BoardSpy::detectStone(const BYTE* DIBS, int move, bool& isLastMove) const {
 
 	isLastMove = false;
 
 	bool is_black = false, is_white = false;
-	auto bratio = compareBoardRegionAt(move, blackStoneData_, stoneMaskData_);
+	auto bratio = compareBoardRegionAt(DIBS, move, blackStoneData_, stoneMaskData_);
 	if (bratio > 0.9) {
 		is_black = true;
 	} else {
-		auto wratio = compareBoardRegionAt(move, whiteStoneData_, stoneMaskData_);
+		auto wratio = compareBoardRegionAt(DIBS, move, whiteStoneData_, stoneMaskData_);
 		if (wratio > 0.9) {
 			is_white = true;
 		}
@@ -209,11 +189,11 @@ int BoardSpy::detectStone(int move, bool& isLastMove) const {
 
 	if (is_black) {
 		sel = 1;
-		auto ratio = compareBoardRegionAt(move, whiteImage_, lastMoveMaskData_);
+		auto ratio = compareBoardRegionAt(DIBS, move, whiteImage_, lastMoveMaskData_);
 		isLastMove = (ratio > 0.9);
 	} else if (is_white) {
 		sel = -1;
-		auto ratio = compareBoardRegionAt(move, blackImage_, lastMoveMaskData_);
+		auto ratio = compareBoardRegionAt(DIBS, move, blackImage_, lastMoveMaskData_);
 		isLastMove = (ratio > 0.9);
 	}
 
@@ -228,7 +208,7 @@ int BoardSpy::detectStone(int move, bool& isLastMove) const {
 	return sel;
 }
 
-double BoardSpy::compareBoardRegionAt(int idx, const std::vector<BYTE>& stone, const std::vector<BYTE>& mask) const {
+double BoardSpy::compareBoardRegionAt(const BYTE* DIBS, int idx, const std::vector<BYTE>& stone, const std::vector<BYTE>& mask) const {
 
 	auto left = tplStoneSize_*(idx%19);
 	auto top = tplStoneSize_*(idx/19);
@@ -244,7 +224,6 @@ double BoardSpy::compareBoardRegionAt(int idx, const std::vector<BYTE>& stone, c
 
 
 	int counts = 0;
-	const BYTE* data = boardDIB_.data();
 	auto pmask = &mask[0];
 
 	const BYTE* pstone = &stone[0];
@@ -259,9 +238,9 @@ double BoardSpy::compareBoardRegionAt(int idx, const std::vector<BYTE>& stone, c
 			counts++;
 			
 			auto idx = y*biWidthBytes + j*nBpp_;
-			auto r = data[idx + 2];
-			auto g = data[idx + 1];
-			auto b = data[idx];
+			auto r = DIBS[idx + 2];
+			auto g = DIBS[idx + 1];
+			auto b = DIBS[idx];
 			
 			auto idx2 = (i - top)*tplStoneSize_ * 3 + (j - left) * 3;
 			auto r2 = pstone[idx2];
@@ -279,10 +258,24 @@ double BoardSpy::compareBoardRegionAt(int idx, const std::vector<BYTE>& stone, c
 
 bool BoardSpy::scanBoard(int data[], int& lastMove) {
 
+	Hdc hdc;
+	hdc = GetWindowDC(hWnd);
+
+	// copy screen to bitmap
+	if (stoneSize_ != tplStoneSize_) {
+		
+		StretchBlt(hBoardDC_, 0, 0, tplBoardSize_, tplBoardSize_, hdc, offsetX_, offsetY_, stoneSize_ * 19, stoneSize_ * 19, SRCCOPY);
+	}
+	else {
+		BitBlt(hBoardDC_, 0, 0, tplBoardSize_, tplBoardSize_, hdc, offsetX_, offsetY_, SRCCOPY);
+	}
+		
+	boardDIB_.getFromBitmap(hDisplayDC_, nDispalyBitsCount_, hBoardBitmap_, tplBoardSize_, tplBoardSize_);
+
 	lastMove = -1;
 	for (auto idx = 0; idx < 361; idx++) {
 		bool isLastMove;
-		auto stone = detectStone(idx, isLastMove);
+		auto stone = detectStone(boardDIB_.data(), idx, isLastMove);
 		data[idx] = stone;
 
 		if (isLastMove)
@@ -389,26 +382,6 @@ bool BoardSpy::calcBoardPositions(HWND hWnd, int startx, int starty) {
 	offsetY_ = ty + 1;
 	stoneSize_ = boardw / 19;
 
-	Hdc hdc;
-	hdc = GetWindowDC(hWnd);
-
-	// copy screen to bitmap
-	if (stoneSize_ != tplStoneSize_) {
-		
-		StretchBlt(hBoardDC_, 0, 0, tplBoardSize_, tplBoardSize_, hdc, offsetX_, offsetY_, stoneSize_ * 19, stoneSize_ * 19, SRCCOPY);
-	}
-	else {
-		BitBlt(hBoardDC_, 0, 0, tplBoardSize_, tplBoardSize_, hdc, offsetX_, offsetY_, SRCCOPY);
-	}
-		
-	boardDIB_.getFromBitmap(hDisplayDC_, nDispalyBitsCount_, hBoardBitmap_, tplBoardSize_, tplBoardSize_);
-	static bool done = false;
-			if (!done) {
-				done = true;
-				boardDIB_.save("test.bmp");
-			}
-
-	error_count_ = 0;
 	return true;
 }
 
@@ -453,30 +426,33 @@ bool BoardSpy::routineCheck() {
 
 		if (!IsWindow(hTargetWnd))
 			return false;
+
+		GetWindowRect(hTargetWnd, &lastRect_);
+
 	} else {
-		if (!calcBoardPositions(hTargetWnd, -1, -1)) {
-			if (error_count_++ > 10) {
-				releaseWindows();
-				return false;
+		RECT rc;
+		GetWindowRect(hTargetWnd, &rc);
+
+		if (lastRect_.left != rc.left ||
+			lastRect_.top != rc.top ||
+			lastRect_.right != rc.right ||
+			lastRect_.bottom != rc.bottom) {
+
+			if (!calcBoardPositions(hTargetWnd, -1, -1)) {
+				if (error_count_++ > 10) {
+					releaseWindows();
+					return false;
+				}
+				return true;
 			}
-			return true;
-		}
+
+			lastRect_ = rc;
+
+			if (onSizeChanged)
+				onSizeChanged();
+		}	
 	}
 
-	RECT rc;
-	if (!GetWindowRect(hTargetWnd, &rc))
-		return false;
-
-	if (lastRect_.left != rc.left ||
-		lastRect_.top != rc.top ||
-		lastRect_.right != rc.right ||
-		lastRect_.bottom != rc.bottom) {
-
-		if (onSizeChanged)
-			onSizeChanged();
-	}
-
-	lastRect_ = rc;
 
 	int curBoard[361];
 	int lastMove;
@@ -488,6 +464,8 @@ bool BoardSpy::routineCheck() {
 		}
 		return true;
 	}
+
+	error_count_ = 0;
 
 	auto thres = THRESH_STONE_EXISTS_INTERVAL;
 
@@ -613,6 +591,7 @@ POINT BoardSpy::coord2Screen(int x, int y) const {
 }
 
 
+
 void BoardSpy::placeAt(int x, int y) {
 
 	POINT at = coord2Screen(x, y);
@@ -634,8 +613,17 @@ void BoardSpy::placeAt(int x, int y) {
 	int Y = offsetY_ + y*stoneSize_ + stoneSize_ / 2;
 	int X = offsetX_ + x*stoneSize_ + stoneSize_ / 2;
 	int lparam =  (Y << 16) +  X;
+	
 	::PostMessage(hTargetWnd, WM_LBUTTONDOWN, 0, lparam);
+	Sleep(100);
 	::PostMessage(hTargetWnd, WM_LBUTTONUP, 0, lparam);
+
+SendMessage(hTargetWnd, WM_MOUSEMOVE, 0, MAKELPARAM(X, Y));
+	Sleep(100);
+	SendMessage(hTargetWnd, WM_LBUTTONDOWN, MK_LBUTTON, MAKELPARAM(X, Y));
+	Sleep(50);
+	SendMessage(hTargetWnd, WM_LBUTTONUP, 0, MAKELPARAM(X, Y));
+	Sleep(100);
 	*/
 }
 
@@ -650,7 +638,7 @@ inline void trim(std::string &ss)
 
 void BoardSinker::init(const std::string& cfg_path) {
 	
-	std::string weights_path = "not_exists";
+	std::string weights_path;
 	bool policy_only = false;
 	bool aq_engine = false;
 	
@@ -699,11 +687,13 @@ void BoardSinker::init(const std::string& cfg_path) {
 	else 
 		args.push_back("leela");
 	
-	args.push_back("--weights");
-	args.push_back(weights_path);
+	if (weights_path.size()) {
+		args.push_back("--weights");
+		args.push_back(weights_path);
+	}
 	
 	args.push_back("--working_dir");
-	args.push_back(cfg_path);
+	args.push_back(cfg_path + "\\");
 	
 	for (int i=1; i<__argc; i++) {
 		args.push_back(__argv[i]);
@@ -719,12 +709,12 @@ void BoardSinker::init(const std::string& cfg_path) {
 		return;
 	}
 	
-	gtp->send_command("isready");
+	send_command("isready");
 
 	std::thread([&](){
 		while (true) {
 			std::string prev_cmd, rsp;
-			gtp->unsolicite(prev_cmd, rsp);
+			unsolicite(prev_cmd, rsp);
 			if (prev_cmd == "quit")
 				break;
 
@@ -749,16 +739,29 @@ void BoardSinker::init(const std::string& cfg_path) {
 						player = -1;
 
 					if (onMovePredict)
-						onMovePredict(player, xy.first-1, xy.second-1);
+						onMovePredict(player, xy.first, xy.second);
 				}
 			}
 		}
 	}).detach();
 }
 
+
 void BoardSinker::deinit() {
-	gtp->send_command("quit");
+	send_command("quit");
 	gtp->join();
+}
+
+void BoardSinker::send_command(const std::string& cmd) {
+	gtp->send_command(cmd);
+	if (onGtp)
+		onGtp(cmd, false);
+}
+
+void BoardSinker::unsolicite(std::string& cmd, std::string& rsp) {
+	gtp->unsolicite(cmd, rsp);
+	if (onGtp)
+		onGtp(rsp, true);
 }
 
 void BoardSinker::commitMove(int player, int x, int y) {
@@ -768,12 +771,12 @@ void BoardSinker::commitMove(int player, int x, int y) {
 
 	auto movetext = xy2movetext(x+1, y+1);
 	if (player == 1)
-		gtp->send_command(std::string("play b ") + movetext);
+		send_command(std::string("play b ") + movetext);
 	else 
-		gtp->send_command(std::string("play w ") + movetext);
+		send_command(std::string("play w ") + movetext);
 
 	if (-player == myTurn_) {
-		gtp->send_command(myTurn_ == 1 ? "genmove b nocommit" : "genmove w nocommit");
+		send_command(myTurn_ == 1 ? "genmove b nocommit" : "genmove w nocommit");
 	}
 
 	if (onMoveChange)
@@ -787,9 +790,10 @@ void BoardSinker::newGame(int mycolor) {
 	turn_ = 1;
 	myTurn_ = mycolor;
 
-	gtp->send_command("clear_board");
-	if (mycolor == 1)
-		gtp->send_command("genmove b nocommit");
+	send_command("clear_board");
+	if (mycolor == 1) {
+		send_command("genmove b nocommit");
+	}
 }
 
 

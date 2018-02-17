@@ -1,6 +1,9 @@
 #
 cmake_minimum_required(VERSION 2.8)
 
+## cmake .. -G "Visual Studio 14 2015 Win64" -T host=x64 
+## cmake --build . --config Release
+
 project (dnn-go C CXX)
 
   if(MSVC)
@@ -23,12 +26,13 @@ project (dnn-go C CXX)
   endif()
   
 
+add_subdirectory(goengine)
 
-add_subdirectory(gomodel)
-add_subdirectory(engine)
+#add_subdirectory(gomodel)
+#add_subdirectory(engine)
 
-if (WIN32)
-  add_subdirectory(backface)
-else()
-  add_subdirectory(train)
-endif()
+#if (WIN32)
+#  add_subdirectory(backface)
+#else()
+#  add_subdirectory(train)
+#endif()
