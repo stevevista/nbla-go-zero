@@ -6,7 +6,7 @@
 #include <deque>
 #include <functional>
 #include <thread>
-#include <engine/gtp.h>
+#include <goengine/gtp.h>
 
  
 class BoardSinker {

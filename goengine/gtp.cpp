@@ -6,78 +6,22 @@
 #include <stdarg.h>
 #include <cstdlib>
 #include <cctype>
-#include "leela/Utils.h"
-#include "AQ/src/board_config.h"
 #include "Leela.h"
 #include "aq.h"
 
 
-using namespace Utils;
 
-static bool FindStr(std::string str, std::string s1){
-	return 	str.find(s1) != std::string::npos;
-}
-static bool FindStr(std::string str, std::string s1, std::string s2){
-	return 	str.find(s1) != std::string::npos ||
-			str.find(s2) != std::string::npos;
-}
-static bool FindStr(std::string str, std::string s1, std::string s2, std::string s3){
-	return 	str.find(s1) != std::string::npos ||
-			str.find(s2) != std::string::npos ||
-			str.find(s3) != std::string::npos;
-}
-static bool FindStr(std::string str, std::string s1, std::string s2, std::string s3, std::string s4){
-	return 	str.find(s1) != std::string::npos ||
-			str.find(s2) != std::string::npos ||
-			str.find(s3) != std::string::npos ||
-			str.find(s4) != std::string::npos;
-}
-
-
-
-
-/**
- *  Break character string with delimiter.
- */
-template <typename List>
-void SplitString(const std::string& str, const std::string& delim, List& split_list)
-{
-    split_list.clear();
-
-    using string = std::string;
-    string::size_type pos = 0;
-
-    while(pos != string::npos ){
-        string::size_type p = str.find(delim, pos);
-
-        if(p == string::npos){
-        	split_list.push_back(str.substr(pos)); break;
-        }
-        else split_list.push_back(str.substr(pos, p - pos));
-
-        pos = p + delim.size();
-    }
-}
-
-
-std::string xy2movetext(int x, int y) {
-
-	std::string str_v;
-	std::string str_x = "ABCDEFGHJKLMNOPQRST";
-	str_v = str_x[x - 1];
-	str_v += std::to_string(y);
-	return str_v;
-}
+using namespace std;
 
 std::pair<int, int> movetext2xy(const std::string& text) {
 
 	if (text == "pass")
-		return {19, 18};
+		return {-1, 0};
 	
 	if (text == "resign")
-		return {20, 18};
+		return {-2, 0};
 				
-	std::string x_list = "ABCDEFGHJKLMNOPQRSTabcdefghjklmnopqrst";
+	static string x_list = "ABCDEFGHJKLMNOPQRSTabcdefghjklmnopqrst";
 
 	std::string str_x = text.substr(0, 1);
 	std::string str_y = text.substr(1);
@@ -88,16 +32,50 @@ std::pair<int, int> movetext2xy(const std::string& text) {
 	return {x, y};
 }
 
-static int movetext2extend(const std::string& text) {
-	auto xy = movetext2xy(text);
-	int x = xy.first;
-	int y = xy.second;
+static string xy2text(int x, int y) {
 
-	return xytoe[x+1][y+1];
+	static const char str_x[] = "ABCDEFGHJKLMNOPQRST";
+	
+	if(x == -1) return "pass";
+	else if(x == -2) return "resign";
+
+	string movetext;
+	movetext = str_x[x];
+	movetext += std::to_string(y+1);
+	return movetext;
 }
 
 
-std::string CoordinateString(int v);
+const string gtp_commands[] = {
+    "protocol_version",
+    "name",
+    "version",
+    "quit",
+    "known_command",
+    "list_commands",
+    "quit",
+    "boardsize",
+    "clear_board",
+    "komi",
+    "play",
+    "genmove",
+    "showboard",
+    "undo",
+    "final_score",
+    "final_status_list",
+    "time_settings",
+    "time_left",
+    "fixed_handicap",
+    "place_free_handicap",
+    "set_free_handicap",
+    "loadsgf",
+    "printsgf",
+    "kgs-genmove_cleanup",
+    "kgs-time_settings",
+    "kgs-game_over",
+    "heatmap",
+    ""
+};
 
 
 Gtp::Gtp(IGtpAgent* agent)
@@ -110,45 +88,132 @@ void Gtp::enable_ponder(bool v) {
 	use_pondering_ = v;
 }
 
+void Gtp::play(bool is_black, int x, int y) {
+
+	string cmd = "play ";
+	cmd += is_black ? "b " : "w ";
+	cmd += xy2text(x, y);
+
+	send_command(cmd);
+}
+
+void Gtp::genmove(bool is_black, bool commmit) {
+
+	string cmd = "genmove ";
+	cmd += is_black ? "b" : "w";
+	if (!commmit)
+		cmd += " nocommit";
+
+	send_command(cmd);
+}
+
+void Gtp::stop_thinking() {
+	if (agent_)
+		agent_->stop_ponder();
+}
+
+void Gtp::run() {
+	
+	th_ = std::thread([&]() {
+	
+		CallGTP();
+	});
+}
+
 int Gtp::CallGTP() {
 
-	std::string gtp_str;
-	std::string command;
-	std::vector<std::string> split_list;
+	string command;
 	bool is_playing = false;
-	int id = -1;
+	int id;
 
-	auto SendGTP = [&](const char* output_str, ...) {
+	bool black_playing = true;
+
+	auto gtp_vprint = [&](string prefix, const char *fmt, va_list ap) {
+		
 		char buffer[4096];
-		va_list args;
-		va_start(args, output_str);
-		int n = vsprintf(buffer, output_str, args);
-		va_end(args);
 
-		s_queue.push({gtp_str, std::string(buffer, n)});
+		if (id != -1) {
+			prefix += std::to_string(id);
+		}
+
+		int n1 = sprintf(buffer, "%s ", prefix.c_str());
+		int n2 = vsprintf(&buffer[n1], fmt, ap);
+		s_queue.push({command, string(buffer, n1+n2)});
 	};
+
+	auto gtp_print = [&](const char *fmt, ...) {
+		va_list ap;
+		va_start(ap, fmt);
+		gtp_vprint("=", fmt, ap);
+		va_end(ap);
+	};
+
+	auto gtp_fail = [&](const char *fmt, ...) {
+		va_list ap;
+		va_start(ap, fmt);
+		gtp_vprint("?", fmt, ap);
+		va_end(ap);
+	};
+
+	auto genmove = [&](bool commit) {
+
+		is_playing = true;
+		
+		auto move = agent_->genmove(black_playing, commit);
+		if (commit)
+			black_playing = !black_playing;
+
+		return xy2text(move.first, move.second);
+	};
+
+	auto play = [&](const string& movetext) {
+
+		if (movetext == "pass")
+			agent_->pass(black_playing);
+		else if (movetext == "resign") {
+			agent_->resign(black_playing);
+			is_playing = false;
+		} else {
+			auto xy = movetext2xy(movetext);
+			agent_->play(black_playing, xy.first, xy.second);
+		}
+
+		black_playing = !black_playing;
+	};
+
+	auto check_player = [&](const string& color) {
+
+		bool is_black = std::toupper(color[0]) == 'B';
+		
+		if (black_playing != is_black) {
+			agent_->pass(black_playing);
+			black_playing = !black_playing;
+		}
+	};
+		
 
 	//    Start communication with the GTP protocol.
 	for (;;) {
-		gtp_str = "";
+		id = -1;
 
 		// Thread that monitors GTP commands during pondering.
 		std::thread read_th([&] {
-			while(gtp_str == "" || gtp_str == "#") {
+			string input_line;
+			while(input_line == "" || input_line == "#") {
 				
-				r_queue.wait_and_pop(gtp_str);
+				r_queue.wait_and_pop(input_line);
 			}
 
 			agent_->stop_ponder();
 
-			if (std::isdigit(gtp_str[0])) {
-				std::istringstream strm(gtp_str);
+			if (std::isdigit(input_line[0])) {
+				std::istringstream strm(input_line);
 				char spacer;
 				strm >> id;
 				strm >> std::noskipws >> spacer;
 				std::getline(strm, command);
 			} else {
-				command = gtp_str;
+				command = input_line;
 			}
 		});
 
@@ -161,12 +226,12 @@ int Gtp::CallGTP() {
 			agent_->ponder_enable();
 
 		// Process GTP command.
-		if (gtp_str == "" || gtp_str == "\n") {
+		if (command == "" || command == "\n") {
 			continue;
 		}
-		else if (command.find("name") == 0) SendGTP("= %s\n\n", agent_->name().c_str());
-		else if (command.find("protocol_version") == 0) SendGTP("= 2.0\n\n");
-		else if (command.find("version") == 0) SendGTP("= 2.0.3\n\n");
+		else if (command.find("name") == 0) gtp_print("%s", agent_->name().c_str());
+		else if (command.find("protocol_version") == 0) gtp_print("2.0");
+		else if (command.find("version") == 0) gtp_print("2.0.3");
 		else if (command.find("boardsize") == 0) {
 			// Board size setting. (only corresponding to 19 size)
 			// "=boardsize 19", "=boardsize 13", ...
@@ -178,118 +243,108 @@ int Gtp::CallGTP() {
 			cmdstream >> tmp;
 
 			if (tmp != 19) {
-				SendGTP("unacceptable size\n\n");
+				gtp_fail("unacceptable size");
 			} else {
 				agent_->clear_board();
 				is_playing = false;
-				SendGTP("= \n\n");
+				black_playing = true;
+			
+				gtp_print("");
 			}
 		}
-		else if (FindStr(gtp_str, "list_commands"))
-		{
-			// Send the corresponding command list.
-			const char* commands = "= boardsize\n"
-			"list_commands\n"
-			"clear_board\n"
-			"genmove\n"
-			"play\n"
-			"quit\n"
-			"time_left\n"
-			"time_settings\n"
-			"name\n"
-			"protocol_version\n"
-			"version\n"
-			"komi\n"
-			"final_score\n"
-			"kgs-time_settings\n"
-			"kgs-game_over\n"
-			"= \n\n";
-			SendGTP(commands);
+		else if (command.find("list_commands") == 0) {
+			string outtmp(gtp_commands[0]);
+			for (int i = 1; gtp_commands[i].size() > 0; i++) {
+				outtmp = outtmp + "\n" + gtp_commands[i];
+			}
+			gtp_print(outtmp.c_str());
 		}
 		else if (command.find("clear_board") == 0)
 		{
 			agent_->clear_board();
 			is_playing = false;
+			black_playing = true;
 
-			SendGTP("= \n\n");
+			gtp_print("");
 			std::cerr << "clear board." << std::endl;
 		}
-		else if (FindStr(gtp_str, "komi"))
+		else if (command.find("komi") == 0)
 		{
-			SplitString(gtp_str, " ", split_list);
-			if(split_list[0] == "=") split_list.erase(split_list.begin());
-
-			double komi_ = stod(split_list[1]);
-			agent_->komi(komi_);
-
-			SendGTP("= \n\n");
+			std::istringstream cmdstream(command);
+			std::string tmp;
+			float komi = 7.5f;
+	
+			cmdstream >> tmp;  // eat komi
+			cmdstream >> komi;
+	
+			if (!cmdstream.fail()) {
+				agent_->komi(komi);
+				gtp_print("");
+			} else {
+				gtp_fail("syntax not understood");
+			}
 		}
-		else if (FindStr(gtp_str, "time_left"))
+		else if (command.find("time_left") == 0)
 		{
 			//
 			// Set remaining time.
 			// "=time_left B 944", "=time_left white 300", ...
-			SplitString(gtp_str, " ", split_list);
-			if(split_list[0] == "=") split_list.erase(split_list.begin());
-
-			int left_time = stoi(split_list[2]);
-			int pl = FindStr(gtp_str, "B", "b")? 1 : 0;
-			agent_->time_left(pl, left_time);
-
-			SendGTP("= \n\n");
+			std::istringstream cmdstream(command);
+			std::string tmp, color;
+			int time, stones;
+	
+			cmdstream >> tmp >> color >> time >> stones;
+	
+			if (!cmdstream.fail()) {
+				int icolor;
+	
+				if (color == "w" || color == "white") {
+					icolor = 0;
+				} else if (color == "b" || color == "black") {
+					icolor = 1;
+				} else {
+					gtp_fail("Color in time adjust not understood.\n");
+					continue;
+				}
+	
+				agent_->time_left(icolor, time);
+	
+				gtp_print("");
+			} else {
+				gtp_fail("syntax not understood");
+			}
 		}
 		else if (command.find("go") == 0) {
 
-			int next_move = agent_->genmove();
-			if(next_move == -1) {
-				SendGTP("= pass\n\n");
-			} else if (next_move == -2) {
-				SendGTP("= resign\n\n");
-			} else{
-				std::string str_nv = CoordinateString(next_move);
-				SendGTP("= %s\n\n", str_nv.c_str());
-			}
+			auto move = genmove(true);
+			gtp_print("%s", move.c_str());
 		} 
 		else if (command.find("auto") == 0) {
 			int passes = 0;
 			int move;
 			do {
-				move = agent_->genmove();
-				std::string str_nv = CoordinateString(move);
-				std::cerr << "> " << str_nv << std::endl;
-				if (move == -1) passes++;
+				auto move = genmove(true);
+				std::cerr << "> " << move << std::endl;
+				if (move == "pass") passes++;
+				else if (move == "resign") break;
 				else passes = 0;
 
 			} while (passes < 2 && move != -2);
-			SendGTP("= \n\n");
+			gtp_print("");
 		} 
-		else if (FindStr(gtp_str, "genmove")) {
+		else if (command.find("genmove") == 0) {
 
-			// Think and send the next move.
-			// "=genmove b", "=genmove white", ...
 			std::istringstream cmdstream(command);
 			std::string tmp;
 	
 			cmdstream >> tmp;  // eat genmove
 			cmdstream >> tmp;
 
-			int pl = std::toupper(tmp[0]) == 'B' ? 1 : 0;
-			bool commit = true;
-			if (command.find("nocommit") != std::string::npos) {
-				commit = false;
-			}
+			check_player(tmp);
+			bool commit = command.find("nocommit") == std::string::npos;
 
-			is_playing = true;
-			int next_move = agent_->genmove(pl, commit);
-			// d. Send response of the next move.
-			if(next_move == -1) {
-				SendGTP("= pass\n\n");
-			} else if (next_move == -2) {
-				SendGTP("= resign\n\n");
-			} else{
-				std::string str_nv = CoordinateString(next_move);
-				SendGTP("= %s\n\n", str_nv.c_str());
-			}
+			auto move = genmove(commit);
+			gtp_print("%s", move.c_str());
 		}
 		else if (command.find("play") == 0)
 		{
@@ -305,21 +360,9 @@ int Gtp::CallGTP() {
 			cmdstream >> color;
 			cmdstream >> vertex;
 
-			int pl = std::toupper(color[0]) == 'B' ? 1 : 0;
-
-			int next_move;
-			if (command.find("pass") != std::string::npos) {
-				agent_->pass(pl);
-			} else if (command.find("resign") != std::string::npos) {
-				agent_->resign(pl);
-				is_playing = false;
-			} else {
-				next_move = movetext2extend(vertex);
-				agent_->play(pl, next_move);
-			}
-
-			// d. Send GTP response.
-			SendGTP("= \n\n");
+			check_player(color);
+			play(vertex);
+			gtp_print("");
 		}
 		else if (command.find("heatmap") == 0) {
 			std::istringstream cmdstream(command);
@@ -334,9 +377,9 @@ int Gtp::CallGTP() {
 			} else {
 				agent_->heatmap(0);
 			}
-			SendGTP("= \n\n");
+			gtp_print("");
 		}
-		else if(FindStr(gtp_str, "final_score")) {
+		else if(command.find("final_score") == 0) {
 
 			auto final_score = agent_->final_score();
 
@@ -347,14 +390,14 @@ int Gtp::CallGTP() {
 			win_pl += ss.str();
 			if(final_score == 0) win_pl = "0";
 
-			SendGTP("= %s\n\n", win_pl.c_str());
+			gtp_print("%s", win_pl.c_str());
 		}
-		else if(FindStr(gtp_str, "isready")) {
-			SendGTP("= readyok\n");
+		else if(command.find("isready") == 0) {
+			gtp_print("readyok");
 		}
-		else if(FindStr(gtp_str, "ponder")) {
+		else if(command.find("ponder") == 0) {
 			is_playing = true;
-			SendGTP("= ponder started.\n");
+			gtp_print("ponder started.");
 		}
 		else if (command.find("time_settings") == 0) {
 			std::istringstream cmdstream(command);
@@ -367,9 +410,9 @@ int Gtp::CallGTP() {
 				// convert to centiseconds and set
 				agent_->set_timecontrol(maintime, byotime, byostones, 0);
 
-				SendGTP("= \n\n");
+				gtp_print("");
 			} else {
-				SendGTP("syntax not understood\n\n");
+				gtp_fail("syntax not understood");
 			}
 		}
 		else if (command.find("kgs-time_settings") == 0) {
@@ -398,23 +441,23 @@ int Gtp::CallGTP() {
 			}
 
 			if (!cmdstream.fail()) {
-				SendGTP("= \n\n");
+				gtp_print("");
 			} else {
-				SendGTP("syntax not understood\n\n");
+				gtp_fail("syntax not understood");
 			}
 		}
-		else if(FindStr(gtp_str, "kgs-game_over")){
+		else if(command.find("kgs-game_over") == 0){
 			agent_->game_over();
 			is_playing = false;
-			SendGTP("= \n\n");
+			gtp_print("");
 		}
-		else if(FindStr(gtp_str, "quit")){
+		else if(command == "quit") {
 			agent_->quit();
-			SendGTP("= \n\n");
+			gtp_print("");
 			break;
 		}
 		else{
-			SendGTP("= \n\n");
+			gtp_print("");
 			std::cerr << "unknown command.\n";
 		}
 	}
@@ -429,8 +472,8 @@ void play_matchs(const std::string& sgffile, IGtpAgent* player1, IGtpAgent* play
 	player1->clear_board();
 	player2->clear_board();
 
-	int move1 = 0;
-	int move2 = 0;
+	std::pair<int, int> xy1 = {0, 0};
+	std::pair<int, int> xy2 = {0, 0};
 	int move_cnt = 0;
 	int winner = -1;
 	
@@ -442,37 +485,38 @@ void play_matchs(const std::string& sgffile, IGtpAgent* player1, IGtpAgent* play
     };
 
 	while (true) {
-		move1 = player1->genmove(1, true);
-		if (move1 == -1) player2->pass(1);
-		else if (move1 == -2) player2->resign(1);
-		else player2->play(1, move1);
+		xy1 = player1->genmove(1, true);
+		if (xy1.first == -1) player2->pass(1);
+		else if (xy1.first == -2) player2->resign(1);
+		else player2->play(true, xy1.first, xy1.second);
 
 		move_cnt++;
 
 		if (callback) {
 			fill_board();
-            int idx = move1;
-            if (move1 >= 0) {
-                idx = etor[move1];
-            }
+            int idx;
+            if (xy1.first >= 0) {
+                idx = xy1.second*19 + xy1.first;
+			} else
+				idx = xy1.first;
             callback(idx, board);
 		}
 
-		if (move1 == -2)
+		if (xy1.first == -2)
 			break;
-		if (move2 == -1 && move1 == -1)
+		if (xy2.first == -1 && xy1.first == -1)
 			break;
 
-		move2 = player2->genmove(0, true);
-		if (move2 == -1) player1->pass(0);
-		else if (move1 == -2) player1->resign(0);
-		else player1->play(0, move1);
+		xy2 = player2->genmove(false, true);
+		if (xy2.first == -1) player1->pass(0);
+		else if (xy2.first == -2) player1->resign(0);
+		else player1->play(false, xy2.first, xy2.second);
 
 		move_cnt++;
 
-		if (move2 == -2)
+		if (xy2.first == -2)
 			break;
-		if (move2 == -1 && move1 == -1)
+		if (xy2.first == -1 && xy1.first == -1)
 			break;
 
 		if (move_cnt >= 361*2)

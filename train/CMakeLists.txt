@@ -49,7 +49,7 @@ target_link_libraries(selfplay nblapp trainmodel leela X11)
 macro(add_example name)
    add_executable(${name} ./${name}.cpp)
    set_property(TARGET ${name} PROPERTY CXX_STANDARD 11)
-   target_link_libraries(${name} nblapp trainmodel lightmodel)
+   target_link_libraries(${name} nblapp trainmodel goengine)
 endmacro()
 
 

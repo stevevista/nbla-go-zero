@@ -27,12 +27,8 @@ project (dnn-go C CXX)
   
 
 add_subdirectory(goengine)
-
-#add_subdirectory(gomodel)
-#add_subdirectory(engine)
-
-#if (WIN32)
-#  add_subdirectory(backface)
-#else()
-#  add_subdirectory(train)
-#endif()
+if (WIN32)
+  add_subdirectory(foxface)
+else()
+  add_subdirectory(train)
+endif()

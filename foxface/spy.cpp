@@ -727,10 +727,10 @@ void BoardSinker::init(const std::string& cfg_path) {
 				auto movetext = rsp.substr(2);
 				auto xy = movetext2xy(movetext);
 
-				if (xy.first == 0) {
+				if (xy.first == -1) {
 					if (onMovePass)
 						onMovePass();
-				} else if (xy.first == -1) {
+				} else if (xy.first == -2) {
 					if (onResign)
 						onResign();
 				} else {
@@ -769,14 +769,9 @@ void BoardSinker::commitMove(int player, int x, int y) {
 	turn_ = -player;
 	steps_++;
 
-	auto movetext = xy2movetext(x+1, y+1);
-	if (player == 1)
-		send_command(std::string("play b ") + movetext);
-	else 
-		send_command(std::string("play w ") + movetext);
-
+	gtp->play(player == 1, x, y);
 	if (-player == myTurn_) {
-		send_command(myTurn_ == 1 ? "genmove b nocommit" : "genmove w nocommit");
+		gtp->genmove(myTurn_ == 1, false);
 	}
 
 	if (onMoveChange)

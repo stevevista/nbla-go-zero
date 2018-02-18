@@ -41,11 +41,11 @@ public:
     void clear_board();
     void komi(float);
     void time_left(int player, double t);
-    void play(int player, int move);
+    void play(bool is_black, int x, int y);
     void pass(int player);
     void resign(int player);
-    int genmove(int player, bool commit);
-    int genmove();
+    std::pair<int, int> genmove(bool is_black, bool commit);
+    std::pair<int, int> genmove();
     void ponder_on_idle();
     void ponder_enable();
     void stop_ponder();

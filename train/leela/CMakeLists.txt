@@ -9,7 +9,7 @@ file(GLOB SOURCES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
   ./*.cpp)
 
 set(target leela)
-add_library(${target} SHARED ${SOURCES})
+add_library(${target} STATIC ${SOURCES})
 
 
 if(MSVC)
@@ -17,7 +17,7 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /STACK:10000000")
 endif()
 
 
-target_link_libraries(${target} lightmodel "-lpthread")
+target_link_libraries(${target} goengine "-lpthread")
 
 
 set_property(TARGET ${target} PROPERTY CXX_STANDARD 11)

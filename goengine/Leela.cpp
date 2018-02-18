@@ -119,27 +119,28 @@ Leela::Leela(const std::vector<std::string>& args)
     game->init_game(19, 7.5);
 }
 
-int Leela::genmove() {
+std::pair<int, int> Leela::genmove() {
     Utils::enable_ponder(true);
-	return genmove(game->get_to_move() == FastBoard::BLACK ? 1 : 0, true);
+	return genmove(game->get_to_move() == FastBoard::BLACK, true);
 }
 
-int Leela::genmove(int player, bool commit) {
+std::pair<int, int> Leela::genmove(bool is_black, bool commit) {
     
-    int who = player == 1 ? FastBoard::BLACK : FastBoard::WHITE;
+    int who = is_black ? FastBoard::BLACK : FastBoard::WHITE;
     //if (who != game->get_to_move())
      //   game->play_pass();
     // start thinking
     Utils::enable_ponder(true);
-    int move = search->think(game->get_to_move(), *game);
+    int move = search->think(who, *game);
     if (commit)
         game->play_move(who, move);
 
     if (move == FastBoard::PASS)
-        return -1;
+        return {-1, 0};
     if (move == FastBoard::RESIGN)
-        return -2;
-    return move;
+        return {-2, 0};
+
+    return game->board.get_xy(move);
 }
 
 int Leela::get_color(int idx) const {
@@ -284,9 +285,14 @@ void Leela::resign(int player) {
     game->play_move(player == 1 ? FastBoard::BLACK : FastBoard::WHITE, FastBoard::RESIGN);
 }
     
-void Leela::play(int player, int move) {
+void Leela::play(bool is_black, int x, int y) {
 
-    game->play_move(player == 1 ? FastBoard::BLACK : FastBoard::WHITE, move);
+    int player = is_black ? FastBoard::BLACK : FastBoard::WHITE;
+    int move;
+    if (x == -1) move = FastBoard::PASS;
+    else if (x == -2) move = FastBoard::RESIGN;
+    else move = game->board.get_vertex(x, y);
+    game->play_move(player, move);
 }
     
     void Leela::quit() {

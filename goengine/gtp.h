@@ -80,11 +80,10 @@ public:
     virtual void clear_board() = 0;
     virtual void komi(float) = 0;
     virtual void time_left(int player, double t) = 0;
-    virtual void play(int player, int move) = 0;
+    virtual void play(bool is_black, int x, int y) = 0;
     virtual void pass(int player) = 0;
     virtual void resign(int player) = 0;
-    virtual int genmove(int player, bool commit) = 0;
-    virtual int genmove() = 0;
+    virtual std::pair<int, int> genmove(bool is_black, bool commit) = 0;
     virtual void ponder_on_idle() = 0;
     virtual void ponder_enable() = 0;
     virtual void stop_ponder() = 0;
@@ -126,6 +125,9 @@ public:
         rsp = out.second;
     }
 
+    NENG_API void play(bool is_black, int x, int y);
+    NENG_API void genmove(bool is_black, bool commmit);
+
     NENG_API void enable_ponder(bool);
     NENG_API void run();
     NENG_API void stop_thinking();
@@ -136,7 +138,6 @@ public:
 };
 
 
-NENG_API std::string xy2movetext(int x, int y);
 NENG_API std::pair<int, int> movetext2xy(const std::string& text);
 
 NENG_API std::shared_ptr<IGtpAgent> create_agent(const std::vector<std::string>& args);

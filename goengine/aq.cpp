@@ -70,19 +70,6 @@ AQ::AQ(const std::vector<std::string>& args) {
 	tree = std::make_shared<Tree>();
 }
 
-void Gtp::run() {
-
-    th_ = std::thread([&]() {
-
-        CallGTP();
-    });
-}
-
-void Gtp::stop_thinking() {
-	if (agent_)
-		agent_->stop_ponder();
-}
-
 
 void AQ::clear_board() {
 	// Initialize the board.
@@ -95,43 +82,47 @@ void AQ::komi(float v) {
 	tree->komi = cfg_komi;
 }
 
-int AQ::genmove() {
-	return genmove(b.my, true);
+void AQ::pass(int player) {
+
+	assert(player == b.my);
+    b.PlayLegal(PASS);
+	tree->UpdateRootNode(b);
+	--b.pass_cnt[b.her];
+}
+        
+void AQ::resign(int player) {
+
+	assert(player == b.my);
+    b.PlayLegal(PASS);
+	tree->UpdateRootNode(b);
 }
 
-int AQ::genmove(int player, bool commit) {
+
+std::pair<int, int> AQ::genmove(bool is_black, bool commit) {
 	
+	int player = is_black ? 1 : 0;
 	auto t1 = std::chrono::system_clock::now();
 	cerr << "thinking...\n";
 
-	if(player != b.my){
-		// Insert pass if the turn is different.
-		b.PlayLegal(PASS);
-		tree->UpdateRootNode(b);
-		--b.pass_cnt[b.her];
-	}
+	assert(player == b.my);
 
-	int next_move;
 	tree->stop_think = false;
-	bool think_full = true;
 	double win_rate;
 
-	if(think_full) {
-		//    Search for the best move.
-		next_move = tree->SearchTree(b, 0.0, win_rate, true, false);
-	}
+	//    Search for the best move.
+	auto next_move = tree->SearchTree(b, 0.0, win_rate, true, false);
 
-	else if(win_rate < 0.1) {
+	if(win_rate < 0.1) {
 				
 		// Roll out 1000 times to check if really losing.
 		Board b_;
 		int win_cnt = 0;
-		for(int i=0;i<1000;++i){
-					b_ = b;
-					int result = PlayoutLGR(b_, tree->lgr, tree->komi);
-					if(b.my == std::abs(result)) ++win_cnt;
+		for(int i=0;i<1000;++i) {
+			b_ = b;
+			int result = PlayoutLGR(b_, tree->lgr, tree->komi);
+			if(b.my == std::abs(result)) ++win_cnt;
 		}
-		if((double)win_cnt / 1000 < 0.25) next_move = PASS;
+		if((double)win_cnt / 1000 < 0.3) next_move = PASS;
 	}
 
 	if (commit) {
@@ -140,30 +131,24 @@ int AQ::genmove(int player, bool commit) {
 		tree->UpdateRootNode(b);
 	}
 
-	if(next_move == PASS){
+	if(next_move == PASS) {
 		if(!never_resign && win_rate < 0.1) next_move = -2; // RESIGN
 		else next_move = -1; //PASS
 	}
 
 	// g. Update remaining time.
-	if(need_time_controll){
+	if(need_time_controll) {
 		auto t2 = std::chrono::system_clock::now();
 		double elapsed_time = (double)std::chrono::duration_cast<std::chrono::milliseconds>(t2-t1).count()/1000;
 		tree->left_time = std::max(0.0, (double)tree->left_time - elapsed_time);
 	}
 
-	return next_move;
+	if (next_move < 0)
+		return {next_move, 0};
+
+	return {etox[next_move]-1, etoy[next_move]-1};
 }
 
-void AQ::pass(int player) {
-    b.PlayLegal(PASS);
-	tree->UpdateRootNode(b);
-}
-        
-void AQ::resign(int player) {
-    b.PlayLegal(PASS);
-	tree->UpdateRootNode(b);
-}
 
 void AQ::stop_ponder() {
 	tree->stop_think = true;
@@ -197,7 +182,12 @@ std::string AQ::name() {
 	return "AQ";
 }
 
-void AQ::play(int player, int move) {
+void AQ::play(bool is_black, int x, int y) {
+
+	int player = is_black ? 1 : 0;
+	int move;
+	if (x < 0) move = PASS;
+	else move = xytoe[x+1][y+1];
 
 	//    Insert pass before placing a opponent's stone.
 	if (b.my != player)

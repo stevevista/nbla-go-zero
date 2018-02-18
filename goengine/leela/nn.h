@@ -1,9 +1,83 @@
 #pragma once
-#include "../AQ/model/model.h"
+#include "../AQ/model/dnn/layers.h"
+#include "../AQ/model/dnn/core.h"
 
 using namespace dlib;
-using namespace lightmodel;
 
+
+constexpr int board_size = 19;
+constexpr int board_count = board_size*board_size;
+constexpr int board_moves = board_count + 1;
+
+
+template <int N, long kernel, typename SUBNET> using bn_conv2d = affine<con<N,kernel,kernel,1,1,SUBNET>>;
+
+template <int N, typename SUBNET> 
+using block  = bn_conv2d<N,3,relu<bn_conv2d<N,3,SUBNET>>>;
+
+template <template <int,typename> class block, int N, typename SUBNET>
+using residual = add_prev1<block<N,tag1<SUBNET>>>;
+
+template <int classes, typename SUBNET>
+using policy_head = softmax<fc<classes, relu<bn_conv2d<2, 1, SUBNET>>>>;
+
+template <typename SUBNET>
+using value_head = htan<fc<1, fc<256, relu<bn_conv2d<1, 1, SUBNET>>>>>;
+
+
+namespace zero {
+
+constexpr int RESIDUAL_FILTERS = 256;
+constexpr int RESIDUAL_BLOCKS = 19;
+
+template <typename SUBNET> 
+using ares  = relu<residual<block, RESIDUAL_FILTERS, SUBNET>>;
+
+using net_type = 
+                            value_head<
+                            skip1<
+                            policy_head<board_moves,
+                            tag1<
+                            repeat<RESIDUAL_BLOCKS, ares,
+                            relu<bn_conv2d<RESIDUAL_FILTERS,3,
+                            input<matrix<unsigned char>>
+                            >>>>>>>;
+
+}
+
+using zero_net_type = zero::net_type;
+
+// leela model
+namespace leela {
+    
+template <typename SUBNET> 
+using ares  = relu<residual<block, 128, SUBNET>>;   
+    
+using net_type = 
+                            value_head<
+                            skip1<
+                            policy_head<board_moves,
+                            tag1<
+                            repeat<6, ares,
+                            relu<bn_conv2d<128,3,
+                            input<matrix<unsigned char>>
+                            >>>>>>>;
+}
+
+using leela_net_type = leela::net_type;
+
+  
+template <typename SUBNET> 
+using convs  = relu<bn_conv2d<256,3,SUBNET>>;
+                                
+using dark_net_type =       fc_no_bias<1, // fake value head
+                            softmax<
+                            fc_no_bias<board_moves,
+                            con_bias<1,1,1,1,1,
+                            repeat<12, convs,
+                            convs<
+                            input<matrix<unsigned char>>
+                            >>>>>>;
 
 template<typename NET>
 inline const tensor& forward(NET& net, const tensor& input, double temperature, const tensor** value_out) {
@@ -40,24 +114,39 @@ public:
     static constexpr int num_planes = 18;
 
     using prediction = std::vector<float>;
-    using prediction_ex = std::pair<prediction, float>;
 
-    LMODEL_API zero_model();
+    zero_model();
 
-    LMODEL_API bool load_weights(const std::string& path);
+    bool load_weights(const std::string& path);
 
     template<typename FEATURE>
-    prediction_ex predict(const FEATURE& ft, double temperature = 1)  {
+    std::pair<prediction, float> predict(const FEATURE& ft, double temperature = 1)  {
 
-        auto& input = features_to_tensor(&ft, &ft+1);
+        cached_input.set_size(1, type() == 0 ? 1 : num_planes, board_size, board_size);
+
+        auto dst = cached_input.host_write_only();
+        if (cached_input.k() == 1) {
+            for (int i=0; i<board_count; i++) {
+                if (ft[0][i]) *dst = 1;
+                else if (ft[8][i]) *dst = -1;
+                else *dst = 0;
+                dst++;
+            }
+        } else {
+            for (int c=0; c< num_planes; c++) {
+                for (int i=0; i<board_count; i++) {
+                    *(dst++) = (float)ft[c][i];
+                }
+            }
+        }
+
         const tensor* v_tensor = nullptr;
-        auto& out_tensor = forward(input, temperature, &v_tensor);
+        auto& out_tensor = forward(cached_input, temperature, &v_tensor);
         auto src = out_tensor.host();
         auto data = v_tensor->host();
 
         prediction dist(board_moves);
         std::copy(src, src+board_moves, dist.begin());
-        src += board_moves;
         float val = data[0];
 
         return {dist, val};
@@ -74,36 +163,6 @@ public:
 
 private:
     const tensor& forward(const tensor& input, double temperature, const tensor** value_out);
-
-    template<typename ITER>
-    const tensor& features_to_tensor(
-                ITER begin, 
-                ITER end) {
-
-        const int batch_size = std::distance(begin, end);
-        bool darknet_backend = (!zero_weights_loaded && !leela_weights_loaded);
-        cached_input.set_size(batch_size, darknet_backend ? 1 : num_planes, board_size, board_size);
-
-        auto dst = cached_input.host_write_only();
-        for (; begin != end; begin++) {
-            if (cached_input.k() == 1) {
-                for (int i=0; i<board_count; i++) {
-                    if ((*begin)[0][i]) *dst = 1;
-                    else if ((*begin)[8][i]) *dst = -1;
-                    else *dst = 0;
-                    dst++;
-                }
-            } else {
-                for (int c=0; c< num_planes; c++) {
-                    for (int i=0; i<board_count; i++) {
-                        *(dst++) = (float)(*begin)[c][i];
-                    }
-                }
-            }
-        }
-
-        return cached_input;
-    }
 
     zero_net_type zero_net;
     dark_net_type dark_net;

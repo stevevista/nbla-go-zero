@@ -115,7 +115,7 @@ int main(int argc, char *argv[]) {
 			std::string prev_cmd, rsp;
 			gtp.unsolicite(prev_cmd, rsp);
 			
-			std::cout << rsp << std::endl;
+			std::cout << rsp << std::endl << std::endl;
 			if (prev_cmd == "quit")
 				break;
 		}

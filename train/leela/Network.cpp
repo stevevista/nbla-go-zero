@@ -35,17 +35,17 @@
 #include "GTP.h"
 #include "Utils.h"
 #include "NNCache.h"
-#include "../../lightmodel/model.h"
+#include "../../goengine/leela/nn.h"
 
 
 using namespace Utils;
 
 
-static std::shared_ptr<lightmodel::zero_model> model;
+static std::shared_ptr<zero_model> model;
 
 bool Network::load_weights(const std::string& path) {
     if (!model)
-        model = std::make_shared<lightmodel::zero_model>();
+        model = std::make_shared<zero_model>();
     return model->load_weights(path);
 }
 

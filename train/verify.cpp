@@ -1,6 +1,6 @@
 #include <model/convert.hpp>
 #include <model/utils.hpp>
-#include "../lightmodel/model.h"
+#include "../goengine/leela/nn.h"
 #include <fstream>
 #include <cassert>
 
@@ -29,7 +29,7 @@ void verify(
     std::cout << "training data, boardsize = " << boardsize << std::endl;
     std::cout << "total samples = " << N << std::endl;
 
-    lightmodel::zero_model model;
+    zero_model model;
     model.load_weights(weight_path);
 
     size_t seen = 0;
