@@ -370,11 +370,12 @@ target_compile_options(goengine PRIVATE ${active_preprocessor_switches})
 
 
 enable_cpp11_for_target(goengine)
-target_compile_options(goengine PUBLIC ${active_compile_opts} "-msse4.2" "-DNDEBUG")
-
-
-
+target_compile_options(goengine PUBLIC ${active_compile_opts} "-DNDEBUG")
+if(NOT MSVC)
+target_compile_options(goengine PUBLIC "-msse4.2")
 endif()
+
+endif() # 
 
 if(MSVC)
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /STACK:10000000")
@@ -383,4 +384,8 @@ endif()
 add_executable(game ./game.cpp)
 set_property(TARGET game PROPERTY CXX_STANDARD 11)
 
+if(MSVC)
+target_link_libraries(game goengine)
+else()
 target_link_libraries(game goengine z)
+endif()

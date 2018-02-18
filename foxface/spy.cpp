@@ -1,6 +1,7 @@
 
 #include "spy.h"
 #include <fstream>
+#include <sstream>
 #include <set>
 #undef min
 
@@ -30,6 +31,10 @@ static LPCTSTR mask_files[] = {
 
 BoardSpy::BoardSpy() 
 : hTargetWnd(NULL)
+, routineClock_(0)
+, placeStoneClock_(0)
+, exit_(false)
+, placePos_(-1)
 {
 	memset(board, 0, sizeof(board));
 }
@@ -37,12 +42,34 @@ BoardSpy::BoardSpy()
 BoardSpy::~BoardSpy() {
 
 	deinit();
-	releaseWindows();
 
 	if (hDisplayDC_)
 		ReleaseDC(NULL, hDisplayDC_);
 }
 
+
+
+static 
+BOOL CALLBACK Level0EnumWindowsProc(HWND hWnd, LPARAM lParam) {
+
+	RECT rc;
+	GetWindowRect(hWnd, &rc);
+
+	if ((rc.right - rc.left < min_hwnd_pixes) || (rc.bottom - rc.top < min_hwnd_pixes)) {
+		// too small , cant be
+		return TRUE;
+	}
+
+	BoardSpy* spy = (BoardSpy*)lParam;
+	if (spy->bindWindow(hWnd))
+		return FALSE; // end search
+
+	return TRUE;
+}
+
+void BoardSpy::exit() {
+	exit_ = true;
+}
 
 void BoardSpy::initResource() {
 
@@ -76,6 +103,27 @@ void BoardSpy::initResource() {
 	}
 	strcat(program_path, "\\data");
 	init(program_path);
+
+	std::thread([&]() {
+
+		while (!exit_) {
+
+			if (hTargetWnd == NULL) {
+				
+				// Make a callback procedure for Windows to use to iterate
+				// through the Window list
+				FARPROC EnumProcInstance = MakeProcInstance((FARPROC)Level0EnumWindowsProc, g_hInst);
+				// Call the EnumWindows function to start the iteration
+				EnumWindows((WNDENUMPROC)EnumProcInstance, (LPARAM)this);
+				
+				// Free up the allocated memory handle
+				FreeProcInstance(EnumProcInstance);
+			}
+
+			Sleep(1000);
+		}
+
+	}).detach();
 }
 
 
@@ -256,7 +304,7 @@ double BoardSpy::compareBoardRegionAt(const BYTE* DIBS, int idx, const std::vect
 	return diff;
 }
 
-bool BoardSpy::scanBoard(int data[], int& lastMove) {
+bool BoardSpy::scanBoard(HWND hWnd, int data[], int& lastMove) {
 
 	Hdc hdc;
 	hdc = GetWindowDC(hWnd);
@@ -283,26 +331,6 @@ bool BoardSpy::scanBoard(int data[], int& lastMove) {
 	}
 
 	return true;
-}
-
-
-static 
-BOOL CALLBACK Level0EnumWindowsProc(HWND hWnd, LPARAM lParam) {
-
-	RECT rc;
-	GetWindowRect(hWnd, &rc);
-
-	if ((rc.right - rc.left < min_hwnd_pixes) || (rc.bottom - rc.top < min_hwnd_pixes)) {
-		// too small , cant be
-		return TRUE;
-	}
-
-	// Get the list box
-	BoardSpy* spy = (BoardSpy*)lParam;
-	if (spy->bindWindow(hWnd))
-		return FALSE;
-
-	return TRUE;
 }
 
 
@@ -350,7 +378,7 @@ bool BoardSpy::calcBoardPositions(HWND hWnd, int startx, int starty) {
 	if (!found)
 		return false;
 
-	int boardh, boardw;
+	int boardh = 0, boardw = 1;
 	for (int i=ty+1; i<hdib.height(); i++) {
 			if (square_diff(hdib.rgb(tx,i), RGB(60,60,60)) > 0.9) {
 				boardh = i - ty;
@@ -397,14 +425,11 @@ bool BoardSpy::bindWindow(HWND hWnd) {
 	
 	if (calcBoardPositions(hWnd, startx, starty)) {
 		
-		if (!initialBoard())
+		if (!initialBoard(hWnd))
 			return false;
-		
-		if (hTargetWnd) {
-			releaseWindows();
-		}
 
 		hTargetWnd = hWnd;
+		GetWindowRect(hWnd, &lastRect_);
 		return true;
 	}
 
@@ -413,23 +438,78 @@ bool BoardSpy::bindWindow(HWND hWnd) {
 
 bool BoardSpy::routineCheck() {
 
+	routineClock_++;
+
+	std::string ev;
+	while (events.try_pop(ev)) {
+		if (ev == "gtp_ready") {
+			if (onGtpReady)
+				onGtpReady();
+		}
+		else if (ev.find("predict ") == 0) {
+			std::istringstream stream(ev);
+			std::string cmd;
+			int player, x, y;
+			stream >> cmd;
+			stream >> player;
+			stream >> x;
+			stream >> y;
+			if (onMovePredict)
+				onMovePredict(player, x, y);
+		}
+		else if (ev == "pass") {
+			if (onMovePass)
+				onMovePass();
+		}
+		else if (ev == "resign") {
+			if (onResign)
+				onResign();
+		}
+		else if (ev.find("play ") == 0) {
+			std::istringstream stream(ev);
+			std::string cmd;
+			int player, x, y, steps;
+			stream >> cmd;
+			stream >> player;
+			stream >> x;
+			stream >> y;
+			stream >> steps;
+			if (onMoveChange)
+				onMoveChange(player, x, y, steps);
+		}
+		else if (ev.find("gtp:") == 0) {
+			if (onGtp)
+				onGtp(ev.substr(4), false);
+		}
+		else if (ev.find("gtp_rsp:") == 0) {
+			if (onGtp)
+				onGtp(ev.substr(8), true);
+		}
+		else if (ev == "think_end") {
+			if (onThinkEnd)
+				onThinkEnd();
+		}
+		else if (ev == "think") {
+			if (onThink)
+				onThink();
+		}
+	}
+
 	if (!IsWindow(hTargetWnd)) {
 
-		// Make a callback procedure for Windows to use to iterate
-		// through the Window list
-		FARPROC EnumProcInstance = MakeProcInstance((FARPROC)Level0EnumWindowsProc, g_hInst);
-		// Call the EnumWindows function to start the iteration
-		EnumWindows((WNDENUMPROC)EnumProcInstance, (LPARAM)this);
-
-		// Free up the allocated memory handle
-		FreeProcInstance(EnumProcInstance);
-
-		if (!IsWindow(hTargetWnd))
-			return false;
-
-		GetWindowRect(hTargetWnd, &lastRect_);
-
+		hTargetWnd = NULL;
+		return false;
 	} else {
+
+		if (!calcBoardPositions(hTargetWnd, -1, -1)) {
+			if (error_count_++ > 10) {
+				// board closed
+				hTargetWnd = NULL;
+				return false;
+			}
+			return true;
+		}
+
 		RECT rc;
 		GetWindowRect(hTargetWnd, &rc);
 
@@ -438,14 +518,6 @@ bool BoardSpy::routineCheck() {
 			lastRect_.right != rc.right ||
 			lastRect_.bottom != rc.bottom) {
 
-			if (!calcBoardPositions(hTargetWnd, -1, -1)) {
-				if (error_count_++ > 10) {
-					releaseWindows();
-					return false;
-				}
-				return true;
-			}
-
 			lastRect_ = rc;
 
 			if (onSizeChanged)
@@ -453,13 +525,12 @@ bool BoardSpy::routineCheck() {
 		}	
 	}
 
-
 	int curBoard[361];
 	int lastMove;
-	if (!scanBoard(curBoard, lastMove)) {
+	if (!scanBoard(hTargetWnd, curBoard, lastMove)) {
 
 		if (error_count_++ > 10) {
-			releaseWindows();
+			hTargetWnd = NULL;
 			return false;
 		}
 		return true;
@@ -507,6 +578,8 @@ bool BoardSpy::routineCheck() {
 
 	if (sel >= 0) {
 
+		placeStoneClock_ = 0;
+
 		auto player = board[sel];
 		board_last[sel] = player;
 
@@ -522,21 +595,21 @@ bool BoardSpy::routineCheck() {
 		auto x = sel % 19, y = sel / 19;
 		commitMove(player, x, y);
 	}
+
+	if (placeStoneClock_ > 0 && placeStoneClock_ < routineClock_) {
+		if (placeStone)
+			placeStone(placeX_, placeY_);
+	}
 	
 	return true;
 }
 
 
-void BoardSpy::releaseWindows() {
-	hTargetWnd = NULL;
-}
-
-
-bool BoardSpy::initialBoard() {
+bool BoardSpy::initialBoard(HWND hWnd) {
 
 	int curBoard[361];
 	int lastMove;
-	if (!scanBoard(curBoard, lastMove))
+	if (!scanBoard(hWnd, curBoard, lastMove))
 		return false;
 
 	int more_stones = 0;
@@ -561,10 +634,17 @@ bool BoardSpy::initialBoard() {
 		memset(board_last, 0, sizeof(board));
 		memset(board_age, 0, sizeof(board));
 
+		steps_ = 0;
+		turn_ = 1;
+		myTurn_ = 0; // unknow yet
+		predictPos_ = -1;
+		genmoves_ = 0;
+	
+		send_command("clear_board");
 		if (stone_counts == 0) {
-			newGame(1);
+			think();
 		} else 
-			newGame(-1);
+			myTurn_ = -1;
 	}
 
 	return true;
@@ -594,6 +674,11 @@ POINT BoardSpy::coord2Screen(int x, int y) const {
 
 void BoardSpy::placeAt(int x, int y) {
 
+	if (!found()) {
+		placeStoneClock_ = 0;
+		return;
+	}
+
 	POINT at = coord2Screen(x, y);
 
 	POINT pt;
@@ -601,10 +686,14 @@ void BoardSpy::placeAt(int x, int y) {
 	SetCursorPos(at.x, at.y);
 
 	mouse_event( MOUSEEVENTF_LEFTDOWN, 0, 0, 0, NULL);
-	Sleep(10);
+	Sleep(30);
 	mouse_event( MOUSEEVENTF_LEFTUP, 0, 0, 0, NULL);
 
 	SetCursorPos(pt.x, pt.y);
+
+	placeX_ = x;
+	placeY_ = y;
+	placeStoneClock_ = routineClock_ + 50;
 
 	/*
 	if (!found())
@@ -638,6 +727,8 @@ inline void trim(std::string &ss)
 
 void BoardSinker::init(const std::string& cfg_path) {
 	
+	predictPos_ = -1;
+
 	std::string weights_path;
 	bool policy_only = false;
 	bool aq_engine = false;
@@ -711,35 +802,47 @@ void BoardSinker::init(const std::string& cfg_path) {
 	
 	send_command("isready");
 
-	std::thread([&](){
+	std::thread([&]() {
 		while (true) {
 			std::string prev_cmd, rsp;
 			unsolicite(prev_cmd, rsp);
 			if (prev_cmd == "quit")
 				break;
 
-			if (prev_cmd == "isready")
-				if (onGtpReady)
-					onGtpReady();
+			if (prev_cmd == "isready") {
+				events.push("gtp_ready");
+			}
 
 			if (prev_cmd.find("genmove") == 0) {
-				// = d4
-				auto movetext = rsp.substr(2);
-				auto xy = movetext2xy(movetext);
 
-				if (xy.first == -1) {
-					if (onMovePass)
-						onMovePass();
-				} else if (xy.first == -2) {
-					if (onResign)
-						onResign();
-				} else {
-					int player = 1;
-					if (prev_cmd.find("genmove w") == 0)
-						player = -1;
+				genmoves_--;
 
-					if (onMovePredict)
-						onMovePredict(player, xy.first, xy.second);
+				if (genmoves_ == 0) {
+					events.push("think_end");
+					// = d4
+					auto movetext = rsp.substr(2);
+					auto xy = movetext2xy(movetext);
+
+					if (xy.first == -1) {
+						events.push("pass");
+					} else if (xy.first == -2) {
+						events.push("resign");
+					} else {
+						int player = 1;
+						if (prev_cmd.find("genmove w") == 0)
+							player = -1;
+
+						predictPos_ = xy.second * 19 + xy.first;
+
+						std::stringstream ss;
+						ss << "predict ";
+						ss << player;
+						ss << " ";
+						ss << xy.first;
+						ss << " ";
+						ss << xy.second;
+						events.push(ss.str());
+					}
 				}
 			}
 		}
@@ -754,14 +857,12 @@ void BoardSinker::deinit() {
 
 void BoardSinker::send_command(const std::string& cmd) {
 	gtp->send_command(cmd);
-	if (onGtp)
-		onGtp(cmd, false);
+	events.push("gtp:" + cmd);
 }
 
 void BoardSinker::unsolicite(std::string& cmd, std::string& rsp) {
 	gtp->unsolicite(cmd, rsp);
-	if (onGtp)
-		onGtp(rsp, true);
+	events.push("gtp_rsp:" + rsp);
 }
 
 void BoardSinker::commitMove(int player, int x, int y) {
@@ -769,33 +870,51 @@ void BoardSinker::commitMove(int player, int x, int y) {
 	turn_ = -player;
 	steps_++;
 
-	gtp->play(player == 1, x, y);
+	std::string cmd = "play ";
+	cmd += player == 1 ? "b " : "w ";
+	cmd += xy2text(x, y);
+	send_command(cmd);
+
+	if (myTurn_ == 0) {
+		if (predictPos_ == y*19+x)
+			myTurn_ = 1;
+		else
+			myTurn_ = -1;
+	}
+
 	if (-player == myTurn_) {
-		gtp->genmove(myTurn_ == 1, false);
+		think();
 	}
 
-	if (onMoveChange)
-		onMoveChange(player, x, y, steps_);
+	std::stringstream ss;
+	ss << "play ";
+	ss << player;
+	ss << " ";
+	ss << x;
+	ss << " ";
+	ss << y;
+	ss << " ";
+	ss << steps_;
+	events.push(ss.str());
 }
 
+void BoardSinker::think() {
 
-void BoardSinker::newGame(int mycolor) {
-
-	steps_ = 0;
-	turn_ = 1;
-	myTurn_ = mycolor;
-
-	send_command("clear_board");
-	if (mycolor == 1) {
-		send_command("genmove b nocommit");
-	}
+	events.push("think");
+	genmoves_++;
+	send_command(myTurn_ == -1 ? "genmove w nocommit" : "genmove b nocommit");
 }
-
 
 void BoardSinker::stopThink() {
 	gtp->stop_thinking();
 }
 
+void BoardSinker::hint() {
+	if (myTurn_ != turn_)
+		myTurn_ = turn_;
+
+	think();
+}
 
 
 

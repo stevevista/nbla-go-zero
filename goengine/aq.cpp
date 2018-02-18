@@ -189,13 +189,6 @@ void AQ::play(bool is_black, int x, int y) {
 	if (x < 0) move = PASS;
 	else move = xytoe[x+1][y+1];
 
-	//    Insert pass before placing a opponent's stone.
-	if (b.my != player)
-	{
-		b.PlayLegal(PASS);
-		--b.pass_cnt[b.her];
-	}
-
 	// c. Play the move.
 	b.PlayLegal(move);
 	tree->UpdateRootNode(b);

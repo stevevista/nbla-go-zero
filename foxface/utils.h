@@ -98,14 +98,15 @@ public:
 
 	void bitBlt(HWND hwnd, int left, int top) {
 
-		auto hTargetDC = GetWindowDC(hwnd);
+		Hdc hdc;
+		hdc = GetWindowDC(hwnd);
 		RECT rc;
 		GetWindowRect(hwnd, &rc);
 	
 		auto width = rc.right - rc.left;
 		auto height = rc.bottom - rc.top;
-		create(hTargetDC, width, height);
-		bitBlt(hTargetDC, left, top);
+		create(hdc, width, height);
+		bitBlt(hdc, left, top);
 	}
 
 	const HBitmap& bitmap() const { return hbitmap_; }
@@ -166,7 +167,8 @@ public:
 
 		Hdc memdc;
 		HBitmap hbitmap;
-		auto hdc = GetWindowDC(hwnd);
+		Hdc hdc;
+		hdc = GetWindowDC(hwnd);
 		memdc = CreateCompatibleDC(hdc);
 		hbitmap = CreateCompatibleBitmap(hdc, w, h);
 		memdc.selectBitmap(hbitmap);

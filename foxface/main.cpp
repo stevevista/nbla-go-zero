@@ -141,8 +141,12 @@ INT_PTR CALLBACK Dialog::Proc(UINT uMsg, WPARAM wParam, LPARAM lParam) {
 		WORD wID = LOWORD(wParam);         // item, control, or accelerator identifier 
 
 		if (wID == IDC_BTN_PONDER) {
-			spy.routineCheck();
-			//spy.stopThink();
+			spy.stopThink();
+			return TRUE;
+		}
+
+		if (wID == IDC_BTN_HINT) {
+			spy.hint();
 			return TRUE;
 		}
 
@@ -166,17 +170,48 @@ void Dialog::onInit() {
 
 	SetTimer(hWnd_,             // handle to main window 
 		IDT_TIMER1,            // timer identifier 
-		10,                 // 10-second interval 
+		20,                 // 10-second interval 
 		(TIMERPROC)NULL);     // no timer callback 
 
 	wndLabel_.create(hWnd_);
 
 	szMoves_[0] = 0;
 	spy.onGtp = [&](const std::string& line, bool is_rsp) {
-		wndLabel_.hide();
-		strcat(szMoves_, line.c_str());
-		strcat(szMoves_, _T("\r\n"));
-		SetDlgItemText(hWnd_, IDC_EDIT_STATUS, szMoves_);
+		//wndLabel_.hide();
+		//strcat(szMoves_, line.c_str());
+		//strcat(szMoves_, _T("\r\n"));
+		//SetDlgItemText(hWnd_, IDC_EDIT_STATUS, szMoves_);
+		auto str = line + "\r\n";
+
+		auto hEdit = GetDlgItem(hWnd_, IDC_EDIT_STATUS);
+		SendMessageA(hEdit, EM_SETSEL, 0, -1); //Select all
+		SendMessageA(hEdit, EM_SETSEL, -1, -1);//Unselect and stay at the end pos
+		SendMessageA(hEdit, EM_REPLACESEL, 0, (LPARAM)(str.c_str())); //append text to current pos and 
+	};
+
+	spy.onThink = [&]() {
+		EnableWindow(GetDlgItem(hWnd_, IDC_BTN_HINT), FALSE);
+		EnableWindow(GetDlgItem(hWnd_, IDC_BTN_PONDER), TRUE);
+	};
+
+	spy.onThinkEnd = [&]() {
+		EnableWindow(GetDlgItem(hWnd_, IDC_BTN_HINT), TRUE);
+		EnableWindow(GetDlgItem(hWnd_, IDC_BTN_PONDER), FALSE);
+	};
+
+	spy.placeStone = [&](int x, int y) {
+
+		bool show = false;
+		if (wndLabel_.isVisible()) {
+			wndLabel_.hide();
+			show = true;
+			Sleep(10);
+		}
+
+		spy.placeAt(x, y);
+
+		if (show)
+			wndLabel_.show();
 	};
 
 	spy.onMoveChange = [&](char player, int x, int y, int steps) {
@@ -204,10 +239,10 @@ void Dialog::onInit() {
 
 		int label = y*19 + x;
 		wndLabel_.setPos(label);
-		wndLabel_.show();
 		if (autoplay) {
-			spy.placeAt(x, y);
-		}	
+			spy.placeStone(x, y);
+		}
+		wndLabel_.show();
 	};
 
 	spy.onMovePass = [&]() {
@@ -243,19 +278,6 @@ void Dialog::onDetectInterval() {
 	if (r != connected_) {
 		connected_ = r;
 		updateStatus();
-
-		KillTimer(hWnd_, IDT_TIMER1);
-		if (r) {
-			SetTimer(hWnd_,             // handle to main window 
-			IDT_TIMER1,            // timer identifier 
-			50,                 // 10-second interval 
-			(TIMERPROC)NULL);     // no timer callback 
-		} else {
-			SetTimer(hWnd_,             // handle to main window 
-			IDT_TIMER1,            // timer identifier 
-			1000,                 // 10-second interval 
-			(TIMERPROC)NULL);     // no timer callback 
-		}
 	}
 }
 
@@ -264,6 +286,7 @@ void Dialog::onClose() {
 	if (MessageBox(hWnd_, TEXT("Exit?"), TEXT("Exit"),
 		MB_ICONQUESTION | MB_YESNO) == IDYES)
 	{
+		spy.exit();
 		DestroyWindow(hWnd_);
 	}
 }
@@ -346,6 +369,10 @@ PredictWnd* PredictWnd::current = nullptr;
 void PredictWnd::create(HWND hParent) {
 	current = this;
 	hWnd = CreateDialog(g_hInst, MAKEINTRESOURCE(IDD_DIALOG1), hParent, Proc);
+}
+
+bool PredictWnd::isVisible() {
+	return TRUE == IsWindowVisible(hWnd);
 }
 
 INT_PTR CALLBACK PredictWnd::Proc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam) {

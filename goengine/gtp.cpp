@@ -32,7 +32,7 @@ std::pair<int, int> movetext2xy(const std::string& text) {
 	return {x, y};
 }
 
-static string xy2text(int x, int y) {
+string xy2text(int x, int y) {
 
 	static const char str_x[] = "ABCDEFGHJKLMNOPQRST";
 	

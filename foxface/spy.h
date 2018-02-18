@@ -10,22 +10,16 @@
 
  
 class BoardSinker {
-public:
-	std::function<void()> onGtpReady;
-	std::function<void()> onMovePass;
-	std::function<void()> onResign;
-	std::function<void(int player, int x, int y)> onMovePredict;
-	std::function<void(int player, int x, int y, int steps)> onMoveChange;
-	std::function<void(const std::string&, bool is_rsp)> onGtp;
 
 public:
 	void stopThink();
+	void hint();
 	
 protected:
 	void init(const std::string& cfg_path);
 	void deinit();
 
-	void newGame(int mycolor);
+	void think();
 	void commitMove(int player, int x, int y);
 
 	void send_command(const std::string& cmd);
@@ -36,8 +30,13 @@ protected:
 	int turn_;
 	int steps_;
 
+	int predictPos_;
+
 	std::shared_ptr<Gtp> gtp;
-    std::shared_ptr<IGtpAgent> agent;
+	std::shared_ptr<IGtpAgent> agent;
+	
+	safe_queue<std::string> events;
+	int genmoves_;
 };
 
 
@@ -46,17 +45,29 @@ constexpr int max_stone_templates = 3;
 
 class BoardSpy : public BoardSinker {
 public:
+	std::function<void()> onGtpReady;
+	std::function<void()> onMovePass;
+	std::function<void()> onResign;
+	std::function<void(int player, int x, int y)> onMovePredict;
+	std::function<void(int player, int x, int y, int steps)> onMoveChange;
+	std::function<void(const std::string&, bool is_rsp)> onGtp;
+	std::function<void()> onThink;
+	std::function<void()> onThinkEnd;
+
+	// callbacks
+	std::function<void()> onSizeChanged;
+	std::function<void(int x, int y)> placeStone;
 
 	BoardSpy();
 	~BoardSpy();
 
-	// callbacks
-	std::function<void()> onSizeChanged;
+	
 
 	POINT coord2Screen(int x, int y) const;
 	bool found() const;
 
 	void initResource();
+	void exit();
 
 	void placeAt(int x, int y);
 
@@ -66,7 +77,7 @@ public:
 	
 protected:
 	bool initBitmaps();
-	bool scanBoard(int data[], int& lastMove); 
+	bool scanBoard(HWND hwnd, int data[], int& lastMove); 
 	int detectStone(const BYTE* DIBS, int move, bool& isLastMove) const;
 	double compareBoardRegionAt(const BYTE* DIBS, int move, const std::vector<BYTE>& stone, const std::vector<BYTE>& mask) const;
 
@@ -74,12 +85,7 @@ protected:
 	bool calcBoardPositions(HWND hwnd, int startx, int starty);
 
 protected:
-	bool initialBoard();
-	void releaseWindows();
-
-
-
-
+	bool initialBoard(HWND hwnd);
 
 private:
 
@@ -96,6 +102,13 @@ private:
 	std::vector<BYTE> lastMoveMaskData_;
 	std::vector<BYTE> blackImage_;
 	std::vector<BYTE> whiteImage_;
+
+	int routineClock_;
+	int placeStoneClock_;
+	int placeX_;
+	int placeY_;
+	bool exit_;
+	int placePos_;
 
 private:
 	int board[361];
@@ -128,6 +141,7 @@ public:
 	void setPos(int movePos);
 	void update();
 	void hide();
+	bool isVisible();
 
 protected:
 	bool loadRes();
