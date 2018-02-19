@@ -29,17 +29,17 @@
 #include <random>
 #include <chrono>
 
-#include "leela/Utils.h"
-#include "leela/GameState.h"
+#include "leela-zero/src/Utils.h"
+#include "leela-zero/src/GameState.h"
 #include "Leela.h"
-#include "leela/UCTNode.h"
-#include "leela/Network.h"
-#include "leela/TTable.h"
-#include "leela/Zobrist.h"
-#include "leela/Network.h"
-#include "leela/NNCache.h"
-#include "leela/GTP.h"
-#include "leela/SGFTree.h"
+#include "leela-zero/src/UCTNode.h"
+#include "leela-zero/src/Network.h"
+#include "leela-zero/src/TTable.h"
+#include "leela-zero/src/Zobrist.h"
+#include "leela-zero/src/Network.h"
+#include "leela-zero/src/NNCache.h"
+#include "leela-zero/src/GTP.h"
+#include "leela-zero/src/SGFTree.h"
 
 using namespace Utils;
 
@@ -69,8 +69,10 @@ Leela::~Leela() {
     #endif
 }
 
+bool user_interrupt_ponder = false;
+
 void Leela::stop_ponder() {
-    Utils::enable_ponder(false);
+    user_interrupt_ponder = true;
 }
 
 Leela::Leela(const std::vector<std::string>& args)
@@ -120,7 +122,7 @@ Leela::Leela(const std::vector<std::string>& args)
 }
 
 std::pair<int, int> Leela::genmove() {
-    Utils::enable_ponder(true);
+    user_interrupt_ponder = false;
 	return genmove(game->get_to_move() == FastBoard::BLACK, true);
 }
 
@@ -130,7 +132,7 @@ std::pair<int, int> Leela::genmove(bool is_black, bool commit) {
     //if (who != game->get_to_move())
      //   game->play_pass();
     // start thinking
-    Utils::enable_ponder(true);
+    user_interrupt_ponder = false;
     int move = search->think(who, *game);
     if (commit)
         game->play_move(who, move);
@@ -272,7 +274,7 @@ void Leela::ponder_on_idle() {
     
     // now start pondering
     if (game->get_last_move() != FastBoard::RESIGN) {
-        Utils::enable_ponder(true);
+        user_interrupt_ponder = false;
         search->ponder(*game);
     }
 }

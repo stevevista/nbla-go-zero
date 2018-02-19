@@ -1,6 +1,6 @@
 #include <model/convert.hpp>
 #include <model/utils.hpp>
-#include "../goengine/leela/nn.h"
+#include "../goengine/leela-zero/src/nn.h"
 #include <fstream>
 #include <cassert>
 

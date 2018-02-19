@@ -62,6 +62,5 @@ if (NOT WIN32)
 add_example(gendata)
 add_example(train)
 add_example(verify)
-add_example(board_train)
 endif()
 

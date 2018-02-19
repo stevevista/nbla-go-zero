@@ -19,13 +19,13 @@
 #ifndef LEELA_AGENT_H_INCLUDED
 #define LEELA_AGENT_H_INCLUDED
 
-#include "leela/config.h"
+#include "leela-zero/src/config.h"
 #include <string>
 #include <vector>
 #include <functional>
-#include "leela/GameState.h"
+#include "leela-zero/src/GameState.h"
 #include "gtp.h"
-#include "leela/UCTSearch.h"
+#include "leela-zero/src/UCTSearch.h"
 
 class Leela : public IGtpAgent {
     

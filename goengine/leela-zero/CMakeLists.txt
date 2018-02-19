@@ -5,15 +5,10 @@
 
 
 cmake_minimum_required(VERSION 2.8)
-project(goengine)
+project(leelaz)
 
-if(NOT IS_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/AQ/model)
-  message("Cloning AQ.")
-  execute_process(
-          COMMAND git clone https://github.com/stevevista/AQ.git)
-endif()
 
-include(AQ/model/cmake_utils/set_compiler_specific_options.cmake)
+include(../AQ/model/cmake_utils/set_compiler_specific_options.cmake)
 
 
 if (USING_OLD_VISUAL_STUDIO_COMPILER)
@@ -24,7 +19,7 @@ else()
 include(GNUInstallDirs)
 
 # default to a Release build (except if CMAKE_BUILD_TYPE is set)
-include(AQ/model/cmake_utils/release_build_by_default)
+include(../AQ/model/cmake_utils/release_build_by_default)
 
 
 set(CPACK_PACKAGE_VERSION_MAJOR "19")
@@ -148,30 +143,19 @@ endif()
 
 
 add_definitions(-DHAVE_PTHREAD)
-add_definitions(-DUSER_INTERRUPT_PONDER)
 file(GLOB SOURCES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} 
-    AQ/model/*.cpp
-    AQ/model/google/protobuf/*.cc
-    AQ/model/google/protobuf/io/*.cc
-    AQ/model/google/protobuf/stubs/*.cc
-    AQ/src/*.cpp
-    leela-zero/src/*.cpp
-    ./gtp.cpp
-    ./aq.cpp
-    ./Leela.cpp)
-
-list(REMOVE_ITEM SOURCES AQ/src/main.cpp)
-list(REMOVE_ITEM SOURCES leela-zero/src/Leela.cpp)
-list(REMOVE_ITEM SOURCES leela-zero/src/OpenCL.cpp)
-list(REMOVE_ITEM SOURCES leela-zero/src/OpenCLScheduler.cpp)
-list(REMOVE_ITEM SOURCES leela-zero/src/Tuner.cpp)
+    src/*.cpp)
 
 set(source_files 
-    AQ/model/dnn/cpu_dlib.cpp
-    AQ/model/dnn/tensor_tools.cpp
+    ../AQ/model/dnn/cpu_dlib.cpp
+    ../AQ/model/dnn/tensor_tools.cpp
     ${SOURCES})
 
-include_directories(AQ/model leela-zero/stubs)
+LIST(REMOVE_ITEM source_files src/OpenCL.cpp)
+LIST(REMOVE_ITEM source_files src/Tuner.cpp)
+LIST(REMOVE_ITEM source_files src/OpenCLScheduler.cpp)
+
+include_directories(./stubs)
 
 set(dlib_needed_libraries)
 set(dlib_needed_includes)
@@ -191,7 +175,7 @@ endif()
 
       if (DLIB_USE_BLAS OR DLIB_USE_LAPACK OR DLIB_USE_MKL_FFT)
           # Try to find BLAS, LAPACK and MKL
-         include(AQ/model/cmake_utils/cmake_find_blas.txt)
+         include(../AQ/model/cmake_utils/cmake_find_blas.txt)
 
          if (DLIB_USE_BLAS)
             if (blas_found)
@@ -270,7 +254,7 @@ endif()
                endif()
             endif()
 
-            include(AQ/model/cmake_utils/test_for_cudnn/find_cudnn.txt)
+            include(../AQ/model/cmake_utils/test_for_cudnn/find_cudnn.txt)
 
             if (cudnn AND cudnn_include AND NOT DEFINED cuda_test_compile_worked AND NOT DEFINED cudnn_test_compile_worked)
                # make sure cuda is really working by doing a test compile
@@ -285,7 +269,7 @@ endif()
                endif()
 
                try_compile(cuda_test_compile_worked ${PROJECT_BINARY_DIR}/cuda_test_build 
-                           ${PROJECT_SOURCE_DIR}/AQ/model/cmake_utils/test_for_cuda cuda_test
+                           ${PROJECT_SOURCE_DIR}/../AQ/model/cmake_utils/test_for_cuda cuda_test
                            CMAKE_FLAGS ${CUDA_TEST_CMAKE_FLAGS}
                            )
                if (NOT cuda_test_compile_worked)
@@ -293,7 +277,7 @@ endif()
                else()
                   message(STATUS "Checking if you have the right version of cuDNN installed.")
                   try_compile(cudnn_test_compile_worked ${PROJECT_BINARY_DIR}/cudnn_test_build 
-                              ${PROJECT_SOURCE_DIR}/AQ/model/cmake_utils/test_for_cudnn cudnn_test
+                              ${PROJECT_SOURCE_DIR}/../AQ/model/cmake_utils/test_for_cudnn cudnn_test
                               CMAKE_FLAGS ${CUDA_TEST_CMAKE_FLAGS}
                                           )
                   if (NOT cudnn_test_compile_worked)
@@ -327,11 +311,11 @@ endif()
 
          if (CUDA_FOUND AND cudnn AND cuda_test_compile_worked AND cudnn_test_compile_worked AND cudnn_include)
             set(source_files ${source_files} 
-               AQ/model/dnn/cuda_dlib.cu 
-               AQ/model/dnn/cudnn_dlibapi.cpp
-               AQ/model/dnn/cublas_dlibapi.cpp
-               AQ/model/dnn/cuda_data_ptr.cpp
-               AQ/model/dnn/gpu_data.cpp
+               ../AQ/model/dnn/cuda_dlib.cu 
+               ../AQ/model/dnn/cudnn_dlibapi.cpp
+               ../AQ/model/dnn/cublas_dlibapi.cpp
+               ../AQ/model/dnn/cuda_data_ptr.cpp
+               ../AQ/model/dnn/gpu_data.cpp
                )
             set(dlib_needed_libraries ${dlib_needed_libraries} 
                                       ${CUDA_CUBLAS_LIBRARIES} 
@@ -359,37 +343,22 @@ endif()
 
 if (DLIB_USE_CUDA)
   include_directories(${dlib_needed_includes})
-  cuda_add_library(goengine STATIC ${source_files} )
+  cuda_add_executable(leelaz ${source_files} )
 else()
-  add_library(goengine STATIC ${source_files} )
+  add_executable(leelaz ${source_files} )
 endif()
 
-target_include_directories(goengine
+target_include_directories(leelaz
                               INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>
                               INTERFACE $<INSTALL_INTERFACE:include>
                               PUBLIC ${dlib_needed_includes}
                               )
-target_link_libraries(goengine PRIVATE ${dlib_needed_libraries})
-target_compile_options(goengine PRIVATE ${active_preprocessor_switches})
+target_link_libraries(leelaz PRIVATE ${dlib_needed_libraries} z)
+target_compile_options(leelaz PRIVATE ${active_preprocessor_switches})
 
 
-target_compile_options(goengine PUBLIC "-std=c++14")
-target_compile_options(goengine PUBLIC ${active_compile_opts} "-DNDEBUG")
-if(NOT MSVC)
-target_compile_options(goengine PUBLIC "-msse4.2")
-endif()
+target_compile_options(leelaz PUBLIC "-std=c++14" "-march=native" "-flto" "-ffast-math" "-pipe")
+target_compile_options(leelaz PUBLIC ${active_compile_opts} "-DNDEBUG")
 
-endif() # 
 
-if(MSVC)
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /STACK:10000000")
-endif()
-
-add_executable(game ./game.cpp)
-set_property(TARGET game PROPERTY CXX_STANDARD 11)
-
-if(MSVC)
-target_link_libraries(game goengine)
-else()
-target_link_libraries(game goengine z)
 endif()

@@ -35,7 +35,7 @@
 #include "GTP.h"
 #include "Utils.h"
 #include "NNCache.h"
-#include "../../goengine/leela/nn.h"
+#include "../../goengine/leela-zero/src/nn.h"
 
 
 using namespace Utils;
