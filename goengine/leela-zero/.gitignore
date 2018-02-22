@@ -1,9 +1,0 @@
-leelaz
-*.o
-*.d
-.vscode/settings.json
-training/tf/leelalogs
-training/tf/checkpoint
-training/tf/venv
-leelaz-model*
-*.orig
