@@ -27,7 +27,7 @@ project (dnn-go C CXX)
     set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
   endif()
 
-
+add_subdirectory(nnabla-lite)
 add_subdirectory(leela)
 add_subdirectory(nnabla)
 add_subdirectory(nblapp)
