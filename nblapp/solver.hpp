@@ -46,6 +46,12 @@ public:
 };
 
 
+class NPP_API NesterovSolver : public BaseSolver {
+public:
+    NesterovSolver(float learning_rate, float moment = 0.9);
+};
+
+
 
 }
 

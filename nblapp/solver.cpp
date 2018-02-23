@@ -4,7 +4,7 @@
 #include <nbla/computation_graph/variable.hpp>
 #include <nbla/solver/sgd.hpp>
 #include <nbla/solver/momentum.hpp>
-
+#include <nbla/solver/nesterov.hpp>
 
 namespace nblapp {
  
@@ -53,6 +53,11 @@ SgdSolver::SgdSolver(float learning_rate)
 MomentumSolver::MomentumSolver(float learning_rate, float moment)
 {
     ptr_ = nbla::create_MomentumSolver(current_ctx, learning_rate, moment);
+}
+
+NesterovSolver::NesterovSolver(float learning_rate, float moment)
+{
+    ptr_ = nbla::create_NesterovSolver(current_ctx, learning_rate, moment);
 }
 
 

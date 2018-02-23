@@ -11,9 +11,9 @@ void parse_commandline( int argc, char **argv ) {
     for (int i = 1; i < argc; i++) { 
         std::string opt = argv[i];
 
-        if (opt == "--input") {
+        if (opt == "--input" || opt == "-i") {
             opt_input = argv[++i];
-        } else if (opt == "--output") {
+        } else if (opt == "--output" || opt == "-o") {
             opt_output = argv[++i];
         }
     }

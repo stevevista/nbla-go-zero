@@ -412,6 +412,11 @@ void GameArchive::extract_move(const int index, MoveData& out) {
 
     out.input.resize(zero::input_channels);
 
+    blacks = false;
+    whites = false;
+    for (auto& l : out.input)
+        l = false;
+
     int i = 0;
     bool black_player = true;
     for (int step = 0; step < steps; step++) {

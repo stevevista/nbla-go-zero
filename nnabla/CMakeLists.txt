@@ -174,7 +174,7 @@ if(BUILD_CPP_LIB)
     if(MSVC)
       set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS};-Xcompiler /W0")
     else()
-      #set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS};-std=c++11")
+      set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS};-std=c++11")
       set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}; --default-stream per-thread")
     endif()
       

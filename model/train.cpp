@@ -60,7 +60,7 @@ void train(
     std::cout << "learning_rate = " << learning_rate << std::endl;
 
 
-    auto solver = MomentumSolver(learning_rate, 0.9);
+    auto solver = NesterovSolver(learning_rate, 0.9);
     //auto solver = SgdSolver(learning_rate);
 
     //auto solver = create_AdadeltaSolver(context::get_current_context(), learning_rate, weight_decay, 1e-08);

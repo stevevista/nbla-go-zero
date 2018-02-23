@@ -49,8 +49,8 @@ def conv2d(x, W):
 class TFProcess:
     def __init__(self):
         # Network structure
-        self.RESIDUAL_FILTERS = 128
-        self.RESIDUAL_BLOCKS = 6
+        self.RESIDUAL_FILTERS = 192
+        self.RESIDUAL_BLOCKS = 13
 
         # For exporting
         self.weights = []
