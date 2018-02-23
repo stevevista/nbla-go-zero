@@ -14,6 +14,7 @@ enum PAD_TYPE {
 namespace nn {
 
 NPP_API Variable sink(const vector<Variable>& vars, bool one_input_grad);
+NPP_API Variable identity(const Variable& x);
 
 NPP_API Variable add(const Variable& x, double scalar);
 NPP_API Variable add(const Variable& a, const Variable& b, bool inplace=true);

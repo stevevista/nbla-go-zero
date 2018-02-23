@@ -52,8 +52,6 @@ execute_process(
   ${CMAKE_CURRENT_SOURCE_DIR}/build-tools/code_generator/generate.py)
 
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O4 -fPIC -Wall -std=c++11")
-
 ###############################################################################
 # C++ Library
 ###############################################################################
@@ -220,7 +218,10 @@ if(BUILD_CPP_LIB)
   add_library(nnabla SHARED ${SOURCES})
     
   target_link_libraries(nnabla ${NBLA_LINKER_LIBS})
-  set_property(TARGET nnabla PROPERTY CXX_STANDARD 11)
+
+  if (NOT MSVC)
+  target_compile_options(nnabla PRIVATE "-std=c++11")
+  endif()
 
   set(NBLA_LIBRARY_NAME nnabla)
   

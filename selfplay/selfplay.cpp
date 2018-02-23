@@ -9,7 +9,7 @@
 
 #include <fstream>
 #include <cassert>
-#include "dlib/ui.h"
+#include "ui.h"
 
 using std::make_shared;
 using namespace nblapp;

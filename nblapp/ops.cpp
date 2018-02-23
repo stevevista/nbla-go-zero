@@ -29,6 +29,7 @@
 #include <nbla/function/affine.hpp>
 #include <nbla/function/convolution.hpp>
 #include <nbla/function/batch_normalization.hpp>
+#include <nbla/function/identity.hpp>
 #include <cassert>
 
 
@@ -55,6 +56,11 @@ Variable sink(const vector<Variable>& vars, bool one_input_grad) {
     vector<CgVariablePtr> _vars;
     for (auto v : vars) _vars.push_back(v.ptr());
     return connect(fn, _vars)[0];
+}
+
+Variable identity(const Variable& x) {
+    auto fn = make_shared<CgFunction>(create_Identity(current_ctx));
+    return connect(fn, {x.ptr()})[0];
 }
 
 Variable add(const Variable& x, double scalar) {

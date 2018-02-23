@@ -21,6 +21,7 @@ Variable bn_conv2d(const string& name, const Variable& x,
 void ZeroTrainModel::get_training_model() {
     
     if (!input) {
+        
         input = Variable({batch_size_, zero::input_channels, zero::board_size, zero::board_size});
         label = Variable({batch_size_, one_hot_label_ ? 1 : zero::board_moves});
         result = Variable({batch_size_, 1});
@@ -34,9 +35,9 @@ void ZeroTrainModel::get_training_model() {
     
         for (int i=0; i< zero::RESIDUAL_BLOCKS; i++) {
             ParameterScope _(napp::format_str("block_%d", i+1));
-            auto init = h;
+            auto orig = nn::identity(h);
             h = nn::relu(bn_conv2d("0", h, filters, kernel));
-            h = nn::relu(nn::add(bn_conv2d("1", h, filters, kernel), init));
+            h = nn::relu(nn::add(bn_conv2d("1", h, filters, kernel), orig));
         }
     
         Variable dist, res;
@@ -72,6 +73,8 @@ ZeroTrainModel::ZeroTrainModel(int batch_size, float val_scalar, bool one_hot_la
 , one_hot_label_(one_hot_label)
 {
     seen_ = 0;
+    if (batch_size_ == 0) 
+        batch_size_ = 64;
 }
 
 

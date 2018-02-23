@@ -318,9 +318,9 @@ target_include_directories(leela
 target_link_libraries(leela PRIVATE ${dlib_needed_libraries})
 target_compile_options(leela PRIVATE ${active_preprocessor_switches})
 if (NOT MSVC)
-target_compile_options(leela PUBLIC "-std=c++14" "-march=native" "-ffast-math")
+target_compile_options(leela PRIVATE "-std=c++14" "-march=native" "-ffast-math")
 endif()
-target_compile_options(leela PUBLIC ${active_compile_opts} "-DNDEBUG")
+target_compile_options(leela PRIVATE ${active_compile_opts} "-DNDEBUG")
 
 
 endif()

@@ -10,11 +10,11 @@ inline bool is7bit(int c) {
 static int string_to_move(const std::string& movestring, int bsize) {
 
     if (movestring.size() == 0) {
-        return -1;
+        return 361;
     }
 
     if (movestring == "tt") {
-        return -1;
+        return 361;
     }
 
     char c1 = movestring[0];

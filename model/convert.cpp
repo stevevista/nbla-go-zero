@@ -16,42 +16,46 @@ static constexpr float score_thres = 2.5;
 static constexpr int move_count_thres = 30;
 
 
-void proceed_moves(std::ostream& os, int result, const std::vector<int>& tree_moves, int random_drop, 
+void proceed_moves(std::ostream& os, int result, std::vector<int> tree_moves,
     const int64_t total_games,
     const int64_t prcessed, 
     int64_t& total_moves,
     int64_t& total_size) {
 
-    if (!GoBoard::validate_moves(tree_moves))
-        return;
+    if (tree_moves.size() >=2 && 
+        tree_moves[tree_moves.size()-2] == 361 && 
+        tree_moves[tree_moves.size()-1] == 361)
+        tree_moves.erase(tree_moves.end()-1);
 
-    // format: magic(1) move_count(2) result(2) moves(N*2)
+    std::vector<short> seqs;
+    if (!GoBoard::generate_move_seqs(tree_moves, seqs)) {
+        //throw std::runtime_error("bad move sequence");
+        return;
+    }
+
+    // format: magic(1) result(1) move_count(2) move_seqs
     
     if (tree_moves.size() < move_count_thres)
         return;
 
     int move_count = tree_moves.size();
-    if (tree_moves[move_count-1] == -1 && tree_moves[move_count-2] == -1)
-        move_count--;
-
+    
+    // magic
     os.write("g", 1);
-
-    // count
-    short sval = (short)move_count;
-    os.write((char*)&sval, 2);
 
     // result
     char cval = (char)result;
     os.write(&cval, 1);
 
-    // moves
-    for (int i=0; i<move_count; i++) {
-        sval = (short)tree_moves[i];
-        os.write((char*)&sval, 2);
-    }
+    // count
+    short sval = (short)move_count;
+    os.write((char*)&sval, 2);
+
+    // seqs
+    os.write((char*)&seqs[0], seqs.size()*sizeof(short));
 
     total_moves += move_count;
-    total_size += 5 + move_count*2;
+    total_size += 4 + seqs.size()*sizeof(short);
 
     int percent = (prcessed*100)/total_games;
     float gb = float(total_size)/(1024*1024*1024);
@@ -96,7 +100,7 @@ void parse_sgf_file(std::ostream& os, const std::string& sgf_name,
 
         int r = fixed_result > 0 ? 1 : -1;
 
-        proceed_moves(os, r, moves, random_drop, 
+        proceed_moves(os, r, moves,
             total_games,
             prcessed, 
             total_moves,
@@ -211,7 +215,7 @@ int parse_kifu_moves(const std::string& path, const std::map<uint32_t, int>& sco
 
         auto tree_moves = seq_to_moves(seqs);
 
-        proceed_moves(os, result, tree_moves, random_drop, 
+        proceed_moves(os, result, tree_moves,
                     total_games,
                     prcessed, 
                     total_moves,
@@ -274,23 +278,6 @@ GameArchive::GameArchive()
     data_index = 0;
 }
 
-void GameArchive::add(const vector<int>& _moves, int result) {
-
-    vector<short> moves;
-    for (int m : _moves) moves.push_back((short)m);
-    add(moves, result);
-}
-
-void GameArchive::add(const vector<short>& moves, int result) {
-
-    games_.push_back({ moves, result });
-
-    int game_index = games_.size()-1;
-    for (int i=0; i< moves.size(); i++) {
-        entries_.push_back({game_index, i});
-    }
-}
-
 int GameArchive::load(const std::string& path, bool append) {
 
     if (!append) {
@@ -302,34 +289,68 @@ int GameArchive::load(const std::string& path, bool append) {
     if (!ifs)
         return 0;
 
+    auto read_char = [&]() {
+        char v;
+        if (ifs.read(&v, 1).gcount() != 1)
+            throw std::runtime_error("uncomplate move data (read_char)");
+        return v;
+    };
+
+    auto read_short = [&]() {
+        short v;
+        if (ifs.read((char*)&v, 2).gcount() != 2)
+            throw std::runtime_error("uncomplate move data (read_short)");
+        return v;
+    };
+
     int read_moves = 0;
 
-    char c;
-    ifs.read(&c, 1);
-    if (c != 'G') throw std::runtime_error("bad train data signature");
+    auto type = read_char();
+    if (type != 'G' && type != 'P') throw std::runtime_error("bad train data signature");
+
+    follow_distribution_ = false;
+    if (type == 'P')
+        follow_distribution_ = true; // every move followed by 362 move probs
     
     while (true) {
-    
+        char c;
         if (ifs.read(&c, 1).gcount() == 0)
             break;
             
         if (c != 'g') throw std::runtime_error("bad move signature");
-    
-        short count;
-        if (ifs.read((char*)&count, 2).gcount() != 2)
-            throw std::runtime_error("uncomplate move data (reading move counts)");
 
-        char result;
-        if (ifs.read(&result, 1).gcount() != 1)
-            throw std::runtime_error("uncomplate move data (reading result)");
-    
-        vector<short> data(count);
-        int nsize = count*2;
-        if (ifs.read((char*)&data[0], nsize).gcount() != nsize)
-            throw std::runtime_error("uncomplate move data");
-    
-        add(data, (int)result);
-        read_moves += count;
+        int result = (int) read_char();
+        auto steps = read_short();
+
+        if (result !=0 && result !=1 && result != -1)
+            throw std::runtime_error("bad game result");
+
+        game_t game;
+        game.result = result;
+        int game_index = games_.size();
+
+        for (auto step = 0; step < steps; step++) {
+            auto move = read_short();
+            game.seqs.emplace_back(move);
+            entries_.push_back({game_index, step});
+
+            if (move < 0) {
+                auto count = read_short();
+                game.seqs.emplace_back(count);
+                for (int i=0; i<count; i++)
+                    game.seqs.emplace_back(read_short());
+            }  
+
+            if (follow_distribution_) {
+                std::array<float, 362> dist;
+                if (ifs.read((char*)&dist[0], 362*sizeof(float)).gcount() != 362*sizeof(float))
+                    throw std::runtime_error("uncomplate move data (read disttribution)");
+                game.dists.emplace_back(dist);
+            }
+        }
+
+        games_.push_back(std::move(game));
+        read_moves += steps;
     }
     
     ifs.close();
@@ -369,26 +390,81 @@ vector<MoveData> GameArchive::next_batch(int count, bool& rewinded) {
 
     
 void GameArchive::extract_move(const int index, MoveData& out) {
-        
+
     if (index < 0 || index >= entries_.size())
         throw std::runtime_error("extract_move index error");
 
     auto ind = entries_[index];
 
     const int steps = ind.second;
-    const auto& game_rec = games_[ind.first].moves;
-    int result = games_[ind.first].result;
+    const auto& game = games_[ind.first];
+    const auto& game_seq = game.seqs;
+    int result = game.result;
 
-    const int cur_player = (steps%2 == 0) ? 1 : -1;
-    const int cur_move = game_rec[steps];
+    const bool to_move_is_black = (steps%2 == 0);
     
     
-    out.result = cur_player == 1 ? result : -result;
+    out.result = to_move_is_black ? result : -result;
+
+    // replay board
+    BoardPlane blacks;
+    BoardPlane whites;
+
+    out.input.resize(zero::input_channels);
+
+    int i = 0;
+    bool black_player = true;
+    for (int step = 0; step < steps; step++) {
+        
+        auto sign_pos = game_seq[i++];
+        auto pos = std::abs(sign_pos) - 1;
+
+        if (pos > 361)
+            throw std::runtime_error("bad move pos " + std::to_string(pos));
+
+        auto& my_board = black_player ? blacks : whites;
+        auto& op_board = black_player ? whites : blacks;
+
+        if (pos == 361) {
+            // pass
+        } else {
+            my_board[pos] = true;
+            if (sign_pos < 0) {
+                int rm = game_seq[i++];
+
+                for (int n=0; n<rm; n++) {
+                    auto rmpos = game_seq[i++];
+                    
+                    if (rmpos < 0 || rmpos >= 361)
+                        throw std::runtime_error("bad rm move pos " + std::to_string(rmpos));
+                    op_board[rmpos] = false;
+                }
+            }
+        }
+
+        // copy history
+		int h = steps - step - 1;
+		if (h < zero::input_history ) {
+            // collect white, black occupation planes
+            out.input[h] = to_move_is_black ? blacks : whites;
+            out.input[zero::input_history + h] = to_move_is_black ? whites : blacks;
+		}
+
+        black_player = !black_player;
+    }
+
+
     out.probs.resize(362, 0);
-    if (cur_move < 0) out.probs[361] = 1;
-    else {
+
+    if (follow_distribution_) {
+        std::copy(game.dists[steps].begin(), game.dists[steps].end(), out.probs.begin());
+    } else {
+        const int cur_move = std::abs(game_seq[i]) - 1;
         out.probs[cur_move] = 1;
     }
 
-    GoBoard::gather_features(out.input, game_rec.begin(), game_rec.begin()+steps);
+    if (to_move_is_black)
+        out.input[zero::input_channels - 2].set();
+    else
+        out.input[zero::input_channels - 1].set();
 }

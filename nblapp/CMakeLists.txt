@@ -14,4 +14,7 @@ file(GLOB SOURCES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
 
 add_library(nblapp SHARED ${SOURCES})
 target_link_libraries(nblapp nnabla)
-set_property(TARGET nblapp PROPERTY CXX_STANDARD 11)
+if (NOT MSVC)
+target_compile_options(nblapp PRIVATE "-std=c++11")
+endif()
+

@@ -86,7 +86,7 @@ void GoBoard::reset() {
     }
 }
 
-void GoBoard::update_board(const int color, const int i) {
+void GoBoard::update_board(const int color, const int i, std::vector<int>& removed) {
 
     if (i <0 || i >= 361 || stones[i]) {
         std::cout << i << std::endl;
@@ -119,7 +119,7 @@ void GoBoard::update_board(const int color, const int i) {
 
         if (stones[ai] == -color) {
             if (group_libs[group_ids[ai]] == 0) {
-                remove_string(ai);
+                remove_string(ai, removed);
             }
         } else if (stones[ai] == color) {
             int ip = group_ids[i];
@@ -133,16 +133,17 @@ void GoBoard::update_board(const int color, const int i) {
 
     // check whether we still live (i.e. detect suicide)
     if (group_libs[group_ids[i]] == 0) {
-        remove_string(group_ids[i]);
+        remove_string(group_ids[i], removed);
     }
 }
 
-void GoBoard::remove_string(int i) {
+void GoBoard::remove_string(int i, std::vector<int>& removed) {
 
     int pos = i;
 
     do {
         stones[pos]  = 0;
+        removed.emplace_back(pos);
 
         NeighborVistor vistor;
         
@@ -201,20 +202,40 @@ void GoBoard::merge_strings(const int ip, const int aip) {
 }
 
 
-bool GoBoard::validate_moves(const std::vector<int>& moves) {
+bool GoBoard::generate_move_seqs(const std::vector<int>& moves, std::vector<short>& seqs) {
 
     GoBoard b;
     int color = 1;
 
+    seqs.clear();
+
     for (auto idx : moves) {
 
-        if (idx < 0 || idx >= 361) {
+        if (idx < 0 || idx > 361) {
+            return false; // invalid move
+        }
+
+        std::vector<int> removed;
+        short sign_idx = (short)(idx + 1);
+        
+        if (idx == 361) {
             // pass or resign
         } else {
             if (b.stones[idx] != 0) {
-                return false;
+                return false; // invalid move
             }
-            b.update_board(color, idx);
+
+            b.update_board(color, idx, removed);
+        }
+
+        if (removed.size()) 
+            sign_idx = -sign_idx;
+
+        seqs.emplace_back(sign_idx);
+        if (removed.size()) {
+            seqs.emplace_back((short)(removed.size()));
+            for (auto r : removed)
+                seqs.emplace_back((short)r);
         }
             
         color = -color;
