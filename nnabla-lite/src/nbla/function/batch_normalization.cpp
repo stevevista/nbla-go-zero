@@ -22,21 +22,18 @@
 
 namespace nbla {
 
-NBLA_REGISTER_FUNCTION_SOURCE(BatchNormalization, const vector<int> &);
+NBLA_REGISTER_FUNCTION_SOURCE(BatchNormalization, int);
 
 template <typename T>
 void BatchNormalization<T>::setup_impl(const Variables &inputs,
-                                       const Variables &outputs) {
-  // Check axes
-  NBLA_CHECK(axes_.size() == 1, error_code::not_implemented,
-             "Specifying axis more than one is not supported so far.")
+                                       Variable* output) {
 
   // Check and parse shapes
   Shape_t shape_i = inputs[0]->shape();
   Size_t size = inputs[0]->size();
-  Size_t size_axis = inputs[0]->size(axes_[0]);
+  Size_t size_axis = inputs[0]->size(axis_);
   size0_ = size / size_axis;       // Batch size.
-  size1_ = shape_i[axes_[0]];      // Size of specified axis.
+  size1_ = shape_i[axis_];      // Size of specified axis.
   size2_ = size / size0_ / size1_; // Size of rest.
   size12_ = size1_ * size2_;
   size02_ = size0_ * size2_;
@@ -47,7 +44,7 @@ void BatchNormalization<T>::setup_impl(const Variables &inputs,
   Shape_t shape_g = inputs[2]->shape();
   // Verify mean, var, beta and gamma shapes.
   Shape_t shape_check(shape_i.size(), 1);
-  shape_check[axes_[0]] = shape_i[axes_[0]];
+  shape_check[axis_] = shape_i[axis_];
   NBLA_CHECK(shape_check == shape_b, error_code::value,
              "Shape of beta(inputs[1]) does not match. "
              "beta: (%s) != expected: (%s).",
@@ -60,24 +57,24 @@ void BatchNormalization<T>::setup_impl(const Variables &inputs,
              string_join(shape_check, string(", ")).c_str());
 
   // Reshape outputs and/or temporary buffers.
-  outputs[0]->reshape(shape_i, true);
+  output->reshape(shape_i, true);
 }
 
 template <class T>
 void BatchNormalization<T>::forward_impl(const Variables &inputs,
-                                         const Variables &outputs) {
-  forward_impl_global(inputs, outputs);
+                                         Variable* output) {
+  forward_impl_global(inputs, output);
 }
 
 template <class T>
 void BatchNormalization<T>::forward_impl_global(const Variables &inputs,
-                                                const Variables &outputs) {
+                                                Variable* output) {
   // Inputs
   const T *x = inputs[0]->get_data_pointer<T>(this->ctx_);
   const T *beta = inputs[1]->get_data_pointer<T>(this->ctx_);
   const T *gamma = inputs[2]->get_data_pointer<T>(this->ctx_);
   // Output
-  T *y = outputs[0]->cast_data_and_get_pointer<T>(this->ctx_);
+  T *y = output->cast_data_and_get_pointer<T>(this->ctx_);
 
   // Subtract mean and divide by std, and apply beta and gamma.
   for (int i1 = 0; i1 < size1_; ++i1) {

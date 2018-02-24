@@ -22,7 +22,7 @@ namespace nbla {
 
 template <typename T> class ReLUCuda : public ReLU<T> {
 public:
-  explicit ReLUCuda(const Context &ctx, bool inplace) : ReLU<T>(ctx, inplace) {}
+  explicit ReLUCuda(const Context &ctx) : ReLU<T>(ctx) {}
   virtual ~ReLUCuda() {}
   virtual string name() { return "ReLUCuda"; }
   virtual vector<string> allowed_array_classes() {
@@ -30,7 +30,7 @@ public:
   }
 
 protected:
-  virtual void forward_impl(const Variables &inputs, const Variables &outputs);
+  virtual void forward_impl(const Variables &inputs, Variable* output);
 };
 }
 #endif

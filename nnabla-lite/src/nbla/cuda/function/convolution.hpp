@@ -36,8 +36,8 @@ public:
 
 protected:
   int device_;
-  virtual void setup_impl(const Variables &inputs, const Variables &outputs);
-  virtual void forward_impl(const Variables &inputs, const Variables &outputs);
+  virtual void setup_impl(const Variables &inputs, Variable* output);
+  virtual void forward_impl(const Variables &inputs, Variable* output);
 };
 }
 #endif

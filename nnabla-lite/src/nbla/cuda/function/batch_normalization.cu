@@ -43,21 +43,21 @@ __global__ void forward_global_kernel(const int size102_, const int size0_,
 
 template <class T>
 void BatchNormalizationCuda<T>::forward_impl(const Variables &inputs,
-                                             const Variables &outputs) {
+                                             Variable* output) {
   cuda_set_device(std::stoi(this->ctx_.device_id));
-  forward_impl_global(inputs, outputs);
+  forward_impl_global(inputs, output);
   
 }
 
 template <class T>
 void BatchNormalizationCuda<T>::forward_impl_global(const Variables &inputs,
-                                                    const Variables &outputs) {
+                                                    Variable* output) {
   // Inputs
   const T *x = inputs[0]->get_data_pointer<T>(this->ctx_);
   const T *beta = inputs[1]->get_data_pointer<T>(this->ctx_);
   const T *gamma = inputs[2]->get_data_pointer<T>(this->ctx_);
   // Output
-  T *y = outputs[0]->cast_data_and_get_pointer<T>(this->ctx_);
+  T *y = output->cast_data_and_get_pointer<T>(this->ctx_);
 
   NBLA_CUDA_LAUNCH_KERNEL_SIMPLE(
       forward_global_kernel, this->size1_ * this->size02_, this->size0_,

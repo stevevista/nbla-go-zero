@@ -25,8 +25,8 @@ namespace nbla {
 
 template <typename T>
 void SoftmaxCudaCudnn<T>::setup_impl(const Variables &inputs,
-                                     const Variables &outputs) {
-  Softmax<T>::setup_impl(inputs, outputs);
+                                     Variable* output) {
+  Softmax<T>::setup_impl(inputs, output);
   cudnn_handle_ = SingletonManager::get<CudnnHandleManager>()->handle(device_);
   int N = this->size0_;
   int C = this->size1_;
@@ -49,10 +49,10 @@ void SoftmaxCudaCudnn<T>::setup_impl(const Variables &inputs,
 
 template <class T>
 void SoftmaxCudaCudnn<T>::forward_impl(const Variables &inputs,
-                                       const Variables &outputs) {
+                                       Variable* output) {
   cuda_set_device(std::stoi(this->ctx_.device_id));
   const T *x = inputs[0]->get_data_pointer<T>(this->ctx_);
-  T *y = outputs[0]->cast_data_and_get_pointer<T>(this->ctx_);
+  T *y = output->cast_data_and_get_pointer<T>(this->ctx_);
   T alpha = 1;
   T beta = 0;
   NBLA_CUDNN_CHECK(cudnnSoftmaxForward(cudnn_handle_, algorithm_,

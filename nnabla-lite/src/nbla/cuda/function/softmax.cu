@@ -53,11 +53,11 @@ __global__ void kernel_softmax_forward(const int size0x2_, const int size1_,
 
 template <class T>
 void SoftmaxCuda<T>::forward_impl(const Variables &inputs,
-                                  const Variables &outputs) {
+                                  Variable* output) {
   cuda_set_device(std::stoi(this->ctx_.device_id));
   // Setting up variables
   const T *x = inputs[0]->get_data_pointer<T>(this->ctx_);
-  T *y = outputs[0]->cast_data_and_get_pointer<T>(this->ctx_);
+  T *y = output->cast_data_and_get_pointer<T>(this->ctx_);
   NBLA_CUDA_LAUNCH_KERNEL_SIMPLE(kernel_softmax_forward,
                                  this->size0_ * this->size2_, this->size1_,
                                  this->size2_, x, y);

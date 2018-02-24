@@ -25,8 +25,8 @@ namespace nbla {
 */
 template <typename T> class Add2CudaCudnn : public Add2Cuda<T> {
 public:
-  explicit Add2CudaCudnn(const Context &ctx, bool inplace)
-      : Add2Cuda<T>(ctx, inplace), device_(std::stoi(ctx.device_id)) {
+  explicit Add2CudaCudnn(const Context &ctx)
+      : Add2Cuda<T>(ctx), device_(std::stoi(ctx.device_id)) {
     NBLA_CUDNN_CHECK(cudnnCreateTensorDescriptor(&input_desc_));
     NBLA_CUDNN_CHECK(cudnnCreateTensorDescriptor(&output_desc_));
   }
@@ -44,8 +44,8 @@ protected:
   cudnnHandle_t cudnn_handle_;
   cudnnTensorDescriptor_t input_desc_;
   cudnnTensorDescriptor_t output_desc_;
-  virtual void setup_impl(const Variables &inputs, const Variables &outputs);
-  virtual void forward_impl(const Variables &inputs, const Variables &outputs);
+  virtual void setup_impl(const Variables &inputs, Variable* output);
+  virtual void forward_impl(const Variables &inputs, Variable* output);
 };
 }
 #endif

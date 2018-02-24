@@ -32,8 +32,8 @@ protected:
   int device_;
 
 public:
-  BatchNormalizationCuda(const Context &ctx, const vector<int> axes)
-      : BatchNormalization<T>(ctx, axes),
+  BatchNormalizationCuda(const Context &ctx, int axis)
+      : BatchNormalization<T>(ctx, axis),
         device_(std::stoi(ctx.device_id)) {}
   virtual ~BatchNormalizationCuda() {}
   virtual string name() { return "BatchNormalizationCuda"; }
@@ -42,9 +42,9 @@ public:
   }
 
 protected:
-  virtual void forward_impl(const Variables &inputs, const Variables &outputs);
+  virtual void forward_impl(const Variables &inputs, Variable* output);
   virtual void forward_impl_global(const Variables &inputs,
-                                   const Variables &outputs);
+                                   Variable* output);
 };
 }
 #endif

@@ -36,11 +36,11 @@ __global__ void kernel_add2_backward(const int num, T *d, const T *dy) {
 
 template <class T>
 void Add2Cuda<T>::forward_impl(const Variables &inputs,
-                               const Variables &outputs) {
+                               Variable* output) {
   cuda_set_device(std::stoi(this->ctx_.device_id));
   const T *x0 = inputs[0]->get_data_pointer<T>(this->ctx_);
   const T *x1 = inputs[1]->get_data_pointer<T>(this->ctx_);
-  T *y = outputs[0]->cast_data_and_get_pointer<T>(this->ctx_);
+  T *y = output->cast_data_and_get_pointer<T>(this->ctx_);
   size_t size = inputs[0]->size();
   NBLA_CUDA_LAUNCH_KERNEL_SIMPLE(kernel_add2_forward, size, y, x0, x1);
 }

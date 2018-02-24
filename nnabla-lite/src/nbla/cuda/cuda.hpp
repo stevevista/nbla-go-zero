@@ -42,13 +42,6 @@ public:
   /** Get cuBLAS handle of a specified device */
   cublasHandle_t cublas_handle(int device = -1);
 
-  /** Get cuRAND global generator **/
-  curandGenerator_t curand_generator();
-
-  void curand_set_seed(int seed);
-
-  template <typename T> void curand_generate_uniform(T *r, int size);
-
   /** Available array class list used in CUDA Function implementations.
    */
   vector<string> array_classes() const;
@@ -72,7 +65,6 @@ protected:
   std::mutex mtx_curand_;
   unordered_map<int, cublasHandle_t>
       cublas_handles_; ///< cuBLAS handles for each device.
-  unordered_map<int, curandGenerator_t> curand_generators_;
   vector<string> array_classes_;     ///< Available array classes
   MemoryCache<CudaMemory> memcache_; ///< CUDA memory cache.
 

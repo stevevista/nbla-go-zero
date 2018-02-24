@@ -17,27 +17,41 @@
 #ifndef __NBLA_FUNCTION_TANH_HPP__
 #define __NBLA_FUNCTION_TANH_HPP__
 
-#include <nbla/function/utils/base_transform_unary.hpp>
-
+#include <nbla/cpu.hpp>
+#include <nbla/function.hpp>
+#include <nbla/function_registry.hpp>
 #include <cmath>
 
 namespace nbla {
 
-/** @class Tanh
-@brief Hyperbolic tangent (Tanh) defined as
-@f[
-y_i = \tanh (x_i).
-@f]
+NBLA_REGISTER_FUNCTION_HEADER(Tanh);
 
-Inputs:
-- N-D array.
+template <typename T> class Tanh : public Function { 
+public:        
+  virtual ~Tanh() {}                                
+  virtual string name() { return "Tanh"; }              
+    Tanh(const Context &ctx) : Function(ctx) {}      
+    virtual shared_ptr<Function> copy() const {                
+      return create_Tanh(this->ctx_);           
+    }   
+    virtual int min_inputs() { return 1; }
+    virtual vector<string> allowed_array_classes() {
+      return SingletonManager::get<Cpu>()->array_classes();
+    }
+    virtual void setup_impl(const Variables &inputs, Variable* output) {
+      output->reshape(inputs[0]->shape(), true);
+      output->set_array(inputs[0]->array());
+    }
 
-Outputs:
-- N-D array.
+    virtual void forward_impl(const Variables &inputs, Variable* output) {
+      const T *x = inputs[0]->get_data_pointer<T>(this->ctx_);
+      T *y = output->cast_data_and_get_pointer<T>(this->ctx_);
+      for (int idx = 0; idx < inputs[0]->size(); ++idx) {
+        y[idx] = std::tanh(x[idx]);
+      }
+    } 
+};
 
-@tparam T Data type for computation.
-\ingroup FunctionImplGrp
- */
-NBLA_DEFINE_TRANSFORM_UNARY(Tanh, std::tanh(x), dy *((T)1 - y * y), true);
+
 }
 #endif

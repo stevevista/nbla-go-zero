@@ -38,34 +38,22 @@ class CgVariable {
   int consume_counter_; ///< Consumption counter for clearing variable buffer in
                         /// forward or backward computation.
   bool allow_inplace_data_{true}; ///< Whether the data can be in-placed.
-  bool grad_inplaced_{false};     ///< Gradient is in-placed with any of parent
-                                  /// function's inputs grad.
 
   /** Grad in-placed with any of parents. Used to decide whether to clear
       intermediate buffers during backward computation.
   */
-  bool clear_grad_in_backward_{true};
   bool persistent_{false}; ///<Persistency flag against clearing.
 
 public:
   typedef shared_ptr<CgVariable> Ptr;
 
-  /** Ctor wth need_grad option.
 
-      The default shape is 0-shaped array (scalar).
-
-      @param[in] need_grad Whether this variable requires gradient computation
-                 or not
-   */
-  NBLA_API CgVariable(bool need_grad);
-  /** Ctor wth variable shape and need_grad option.
-
+  NBLA_API CgVariable();
+  /** 
       @param[in] shape Shape passed to Variable object held in the created
                  instance.
-      @param[in] need_grad Whether this variable requires gradient computation
-                 or not
    */
-  NBLA_API CgVariable(Shape_t shape, bool need_grad);
+  NBLA_API CgVariable(Shape_t shape);
   /** Ctor wth Variable object.
 
       @param[in] var Reference of an existing Variable object.
@@ -108,16 +96,11 @@ public:
                  option significantly saves the memory consumption. This is not
                  usually used in training phase because backward computation
                  requires data computed during forward prop.
-      @param[in] clear_need_grad Clear the unreferenced variables with
-                 need_grad=False during forward propagation.
-                 True is usually used when calling this during training.
-                 This is ignored when clear_buffer=True.
 
       @seealso set_persistent() to prevent a specific variable to be cleared
                during forward propagation.
    */
-  NBLA_API void forward(bool clear_buffer = false,
-                        bool clear_no_need_grad = false);
+  NBLA_API void forward(bool clear_buffer = false);
 
 
   /** @copydoc function_reference_count_
@@ -143,26 +126,6 @@ public:
    */
   inline void set_allow_inplace_data(bool allow) {
     allow_inplace_data_ = allow;
-  }
-
-  /** @copydoc grad_inplaced_
-   */
-  inline bool grad_inplaced() const { return grad_inplaced_; }
-
-  /**
-      @note User shouldn't call this directly.
-   */
-  inline void set_grad_inplaced(bool inplaced) { grad_inplaced_ = inplaced; }
-
-  /** @copydoc clear_grad_in_backward_
-   */
-  inline bool clear_grad_in_backward() const { return clear_grad_in_backward_; }
-
-  /**
-     @note User shouldn't call this directly.
-   */
-  inline void set_clear_grad_in_backward(bool clear) {
-    clear_grad_in_backward_ = clear;
   }
 
   /**

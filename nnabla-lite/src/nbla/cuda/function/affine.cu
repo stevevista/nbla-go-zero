@@ -24,11 +24,11 @@ namespace nbla {
 
 template <class T>
 void AffineCuda<T>::forward_impl(const Variables &inputs,
-                                 const Variables &outputs) {
+                                 Variable* output) {
   cuda_set_device(std::stoi(this->ctx_.device_id));
   const T *x = inputs[0]->get_data_pointer<T>(this->ctx_);
   const T *w = inputs[1]->get_data_pointer<T>(this->ctx_);
-  T *y = outputs[0]->cast_data_and_get_pointer<T>(this->ctx_);
+  T *y = output->cast_data_and_get_pointer<T>(this->ctx_);
   // y = x * w.
   cuda_gemm<T>(device_, y, true, x, this->i_col_, this->i_row_, true, w,
                this->w_col_, this->w_row_, true, (T)1,

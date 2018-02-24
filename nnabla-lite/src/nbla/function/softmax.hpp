@@ -47,33 +47,32 @@ Outputs:
 @param axis Axis normalization is taken.
 \ingroup FunctionImplGrp
  */
-template <typename T> class Softmax : public BaseFunction<int> {
+template <typename T> class Softmax : public Function {
 protected:
   int axis_;
   int size0_, size1_, size2_;
 
 public:
   Softmax(const Context &ctx, int axis)
-      : BaseFunction(ctx, axis), axis_(axis) {}
+      : Function(ctx), axis_(axis) {}
   virtual ~Softmax() {}
   virtual shared_ptr<Function> copy() const {
     return create_Softmax(ctx_, axis_);
   }
-  virtual vector<dtypes> in_types() { return vector<dtypes>{get_dtype<T>()}; }
-  virtual vector<dtypes> out_types() { return vector<dtypes>{get_dtype<T>()}; }
   virtual int min_inputs() { return 1; }
-  virtual int min_outputs() { return 1; }
   virtual string name() { return "Softmax"; }
   virtual vector<string> allowed_array_classes() {
     return SingletonManager::get<Cpu>()->array_classes();
   }
-  virtual bool grad_depends_output_data(int i, int o) const { return i == 0; }
+  virtual bool inplace_data() const {
+    return true;
+  }
 
 protected:
   NBLA_API virtual void setup_impl(const Variables &inputs,
-                                   const Variables &outputs);
+                                   Variable* output);
   NBLA_API virtual void forward_impl(const Variables &inputs,
-                                     const Variables &outputs);
+                                     Variable* output);
 };
 }
 #endif

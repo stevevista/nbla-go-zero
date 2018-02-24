@@ -72,13 +72,6 @@ public:
 
 protected:
   Context ctx_;                           ///< Storing context.
-  vector<shared_ptr<Shape_t>> in_shapes;  ///< Storing input shapes.
-  vector<shared_ptr<Shape_t>> out_shapes; ///< Storing output shapes.
-
-  /** Fall back function. If this is set at instantiation of Function, behavior
-  of the function will be replaced with the fall-back function.
-  */
-  Ptr fall_back_func_;
 
 public:
   // Inplace level used in inplace_data function.
@@ -90,6 +83,10 @@ public:
   explicit Function(const Context &ctx);
   virtual ~Function() = 0;
 
+public:
+  void forward(const Variables &inputs, Variable* output);
+  
+public:
   /** Setting up function.
 
   This must be called before the Function instance is used, and will do:
@@ -104,33 +101,13 @@ public:
   @param inputs vector of Variable*
   @param outputs vector of Variable*
   */
-  void setup(const Variables &inputs, const Variables &outputs);
+  void setup(const Variables &inputs, Variable* output);
 
-  /** Compute forwardprop and store results into outputs' data.
-
-  Checking shapes before calling forward_impl() which must be implemented in
-  a derived function.
-  @sa setup() arguments.
-  */
-  void forward(const Variables &inputs, const Variables &outputs);
 
   /** Get Context used in this function.
   */
   Context context() const;
 
-  /** Get input dtypes.
-
-  Last in_type will be used repeatedly if size of in_types is smaller than size
-  of inputs
-  */
-  virtual vector<dtypes> in_types() = 0;
-
-  /** Get output dtypes.
-
-  Last out_type will be used repeatedly if size of out_types is smaller than
-  size of outputs
-  */
-  virtual vector<dtypes> out_types() = 0;
 
   /** Get minimum number of inputs.
 
@@ -139,13 +116,6 @@ public:
   */
   virtual int min_inputs() = 0;
 
-  /** Get minimum number of outputs.
-
-  This is meant to be used in setup function with out_types which is used to get
-  max number of outputs.
-  */
-  virtual int min_outputs() = 0;
-
   /** Get function name in string
   */
   virtual string name() = 0;
@@ -153,33 +123,6 @@ public:
   /** Get array classes that are allowed to be specified by Context
   */
   virtual vector<string> allowed_array_classes() = 0;
-
-  /** Depenency flag for checking if in-grad depends on out-data.
-
-      If i=1 and o=0, checking checking if i-th input' gradient
-      computation requires o-th output's data or not.
-
-      @param[in] i Input variable index.
-      @param[in] o Output variable index.
-
-      @note If any of inputs requires an output variable data when computing
-      its gradient, this function must be overridden to return appropreate
-      boorean value. Otherwise, backward computation will be incorrect.
-   */
-  virtual bool grad_depends_output_data(int i, int o) const { return false; }
-  /** Depenency flag for checking if in-grad depends on in-data.
-
-      If i=1 and j=0, checking checking if i-th input' gradient
-     computation requires j-th input's data or not.
-
-      By default, always returns true. If override this in a sub-class, the
-      computation graph engine will optimize memory usage.
-
-      @param[in] i Input variable index.
-      @param[in] j Input variable index.
-
-   */
-  virtual bool grad_depends_input_data(int i, int j) const { return true; }
 
   /** Get in-place-level of i-th input variable's data (see below).
 
@@ -192,46 +135,7 @@ public:
       @note If a subclass uses in-place computation, the function must overwride
      this function.
    */
-  virtual int inplace_data(int i) const { return NOT_INPLACE; }
-
-  /** Get the output variable index where i-th variables' data in-placed to.
-
-      @param[in] i Input variable index.
-      @note This is only valid if the i-th variable is in-placed.
-            The maintainer of a sub-class function must override
-            this function.
-   */
-  virtual int inplace_data_with(int i) const {
-    NBLA_ERROR(
-        error_code::not_implemented,
-        "This must be implemented for in-place support of this function.");
-  }
-
-  /** Get in-place-level of i-th input variable's grad (see below).
-
-      * 0 (NOT_INPLACE): Not in-placed
-      * 1 (INPLACE_NOT_MODIFY): In-placed but not modified.
-      * 2 (INPLACE): In-placed and modified.
-
-      @param[in] i Input variable index.
-      @retval Returns 0 by default.
-      @note If a subclass uses in-place computation, the function must overwride
-     this function.
-   */
-  virtual int inplace_grad(int i) const { return NOT_INPLACE; }
-
-  /** Get the output variable index where i-th variables' grad in-placed to.
-
-      @param[in] i Input variable index.
-      @note This is only valid if the i-th variable is in-placed.
-            The maintainer of a sub-class function must override
-            this function.
-   */
-  virtual int inplace_grad_with(int i) const {
-    NBLA_ERROR(
-        error_code::not_implemented,
-        "This must be implemented for in-place support of this function.");
-  }
+  virtual bool inplace_data() const { return false; }
 
   /** Copy another instance of Function with the same context.
   */
@@ -256,7 +160,7 @@ protected:
   @sa setup() for parameters
   */
   virtual void setup_impl(const Variables &inputs,
-                          const Variables &outputs) = 0;
+                          Variable* output) = 0;
 
   /** Implementation part of forward().
 
@@ -267,7 +171,7 @@ protected:
   @sa setup() arguments.
   */
   virtual void forward_impl(const Variables &inputs,
-                            const Variables &outputs) = 0;
+                            Variable* output) = 0;
 
 
   DISABLE_COPY_AND_ASSIGN(Function);
@@ -284,20 +188,6 @@ protected:
 public:
   BaseFunction(const Context &ctx, Args... args)
       : Function(ctx), args_(args...) {}
-
-  /** Get number of constructor arguments.
-   */
-  int num_args() { return sizeof...(Args); }
-
-  /** Get constructor arguments as a tuple.
-   */
-  const tuple<Args...> &get_args() { return args_; }
-
-  /** Get a constructor argument by index.
-   */
-  template <int Index> auto get_arg() -> decltype(std::get<Index>(args_)) {
-    return std::get<Index>(args_);
-  }
 };
 /*@}*/
 

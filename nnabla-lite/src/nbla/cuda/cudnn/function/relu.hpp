@@ -25,8 +25,8 @@ namespace nbla {
 */
 template <typename T> class ReLUCudaCudnn : public ReLUCuda<T> {
 public:
-  explicit ReLUCudaCudnn(const Context &ctx, bool inplace)
-      : ReLUCuda<T>(ctx, inplace), device_(std::stoi(ctx.device_id)) {
+  explicit ReLUCudaCudnn(const Context &ctx)
+      : ReLUCuda<T>(ctx), device_(std::stoi(ctx.device_id)) {
     NBLA_CUDNN_CHECK(cudnnCreateTensorDescriptor(&input_desc_));
     NBLA_CUDNN_CHECK(cudnnCreateTensorDescriptor(&output_desc_));
     NBLA_CUDNN_CHECK(cudnnCreateActivationDescriptor(&activation_desc_));
@@ -48,8 +48,8 @@ protected:
   cudnnTensorDescriptor_t input_desc_;
   cudnnTensorDescriptor_t output_desc_;
   cudnnActivationDescriptor_t activation_desc_;
-  virtual void setup_impl(const Variables &inputs, const Variables &outputs);
-  virtual void forward_impl(const Variables &inputs, const Variables &outputs);
+  virtual void setup_impl(const Variables &inputs, Variable* output);
+  virtual void forward_impl(const Variables &inputs, Variable* output);
 };
 }
 #endif

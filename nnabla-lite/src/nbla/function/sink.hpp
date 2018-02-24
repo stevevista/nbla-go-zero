@@ -23,37 +23,33 @@
 
 namespace nbla {
 
-NBLA_REGISTER_FUNCTION_HEADER(Sink, bool);
+NBLA_REGISTER_FUNCTION_HEADER(Sink);
 
 /**
     @todo PLACE HERE FUNCTION DOCUMENTATION.
  */
-template <typename T> class Sink : public BaseFunction<bool> {
-protected:
-  bool one_input_grad_;
-
+template <typename T> class Sink : public Function {
 public:
-  Sink(const Context &ctx, bool one_input_grad)
-      : BaseFunction<bool>(ctx, one_input_grad),
-        one_input_grad_(one_input_grad) {}
+  Sink(const Context &ctx)
+      : Function(ctx) {}
   virtual ~Sink() {}
   virtual shared_ptr<Function> copy() const {
-    return create_Sink(ctx_, one_input_grad_);
+    return create_Sink(ctx_);
   }
-  virtual vector<dtypes> in_types() { return vector<dtypes>{get_dtype<T>()}; }
-  virtual vector<dtypes> out_types() { return vector<dtypes>{get_dtype<T>()}; }
   virtual int min_inputs() { return 1; }
-  virtual int min_outputs() { return 1; }
   virtual string name() { return "Sink"; }
   virtual vector<string> allowed_array_classes() {
     return SingletonManager::get<Cpu>()->array_classes();
   }
+  virtual bool inplace_data() const {
+    return true;
+  }
 
 protected:
   NBLA_API virtual void setup_impl(const Variables &inputs,
-                                   const Variables &outputs);
+                                   Variable *output);
   NBLA_API virtual void forward_impl(const Variables &inputs,
-                                     const Variables &outputs);
+                                     Variable* output);
 };
 }
 #endif

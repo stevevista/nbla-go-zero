@@ -12,33 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef __NBLA_CUDA_FUNCTION_TANH_HPP__
-#define __NBLA_CUDA_FUNCTION_TANH_HPP__
+#ifndef __NBLA_CUDA_FUNCTION_MUL_SCALAR_HPP__
+#define __NBLA_CUDA_FUNCTION_MUL_SCALAR_HPP__
 
-
-#include <nbla/function/tanh.hpp>
+#include <nbla/function/mul_scalar.hpp>
 
 namespace nbla {
 
-
-template <typename T> class TanhCuda : public Tanh<T> {  
+  template <typename T> class MulScalarCuda : public MulScalar<T> { 
 protected:
   int device_;
     public:                                                                        \
-  virtual ~TanhCuda() {}                                                     \
-  virtual string name() { return "TanhCuda"; }                     \
-    explicit TanhCuda(const Context &ctx) : Tanh<T>(ctx), 
-    device_(std::stoi(ctx.device_id)) {}    \
-    virtual shared_ptr<Function> copy() const { 
-      return create_Tanh(this->ctx_); 
+  virtual ~MulScalarCuda() {}                                                     \
+  virtual string name() { return "MulScalarCuda"; }                      
+    explicit MulScalarCuda(const Context &ctx) : MulScalar<T>(ctx), device_(std::stoi(ctx.device_id)) {}   
+    virtual shared_ptr<Function> copy() const {                                \
+      return create_MulScalar(this->ctx_);                                        \
     } 
   virtual vector<string> allowed_array_classes() {
     return SingletonManager::get<Cuda>()->array_classes();
   }
     protected:                                                                     \
-  virtual void forward_impl(const Variables &inputs,   
-                            Variable* output); 
-};
+  virtual void forward_impl(const Variables &inputs,                           \
+                            Variable* output);
+  };
 
 
 }

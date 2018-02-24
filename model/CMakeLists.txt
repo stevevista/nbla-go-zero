@@ -25,5 +25,5 @@ target_link_libraries(train nblapp trainmodel)
 target_compile_options(train PRIVATE "-std=c++11")
 
 add_executable(verify ./verify.cpp)
-target_link_libraries(verify nblapp trainmodel leela)
+target_link_libraries(verify leela nnabla-lite)
 target_compile_options(verify PRIVATE "-std=c++11")

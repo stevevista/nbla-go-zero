@@ -12,15 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef __NBLA_CUDNN_INIT_HPP__
-#define __NBLA_CUDNN_INIT_HPP__
-#include <nbla/cuda/defs.hpp>
+// mul_scalar.cpp
+
+#include <nbla/function/mul_scalar.hpp>
 
 namespace nbla {
-/**
-Initialize CUDNN features.
-*/
-NBLA_CUDA_API void init_cudnn();
-}
 
-#endif
+NBLA_REGISTER_FUNCTION_SOURCE(MulScalar);
+
+// Template instanciation
+template class MulScalar<float>;
+}

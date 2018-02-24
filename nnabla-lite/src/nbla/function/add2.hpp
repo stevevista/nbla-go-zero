@@ -23,7 +23,7 @@
 
 namespace nbla {
 
-NBLA_REGISTER_FUNCTION_HEADER(Add2, bool);
+NBLA_REGISTER_FUNCTION_HEADER(Add2);
 
 /** Elementwise add
 The function is defined as
@@ -41,48 +41,29 @@ Outputs:
 @tparam T Data type for computation.
 \ingroup FunctionImplGrp
  */
-template <typename T> class Add2 : public BaseFunction<bool> {
-protected:
-  bool inplace_;
+template <typename T> class Add2 : public BaseFunction<> {
 
 public:
-  Add2(const Context &ctx, bool inplace)
-      : BaseFunction(ctx, inplace), inplace_(inplace) {}
+  Add2(const Context &ctx)
+      : BaseFunction(ctx) {}
   virtual ~Add2() {}
   virtual shared_ptr<Function> copy() const {
-    return create_Add2(ctx_, inplace_);
+    return create_Add2(ctx_);
   }
-  virtual vector<dtypes> in_types() {
-    return vector<dtypes>{get_dtype<T>(), get_dtype<T>()};
-  }
-  virtual vector<dtypes> out_types() { return vector<dtypes>{get_dtype<T>()}; }
   virtual int min_inputs() { return 2; }
-  virtual int min_outputs() { return 1; }
   virtual string name() { return "Add2"; }
   virtual vector<string> allowed_array_classes() {
     return SingletonManager::get<Cpu>()->array_classes();
   }
-  virtual int inplace_data(int i) const {
-    if (this->fall_back_func_ || !inplace_ || i > 0)
-      return Function::NOT_INPLACE;
-    return Function::INPLACE;
+  virtual bool inplace_data() const {
+    return true;
   }
-  virtual int inplace_data_with(int i) const {
-    // 0 is okay because never be called in the case of i != 0.
-    return 0;
-  }
-  virtual int inplace_grad(int i) const {
-    if (this->fall_back_func_ || !inplace_ || i > 0)
-      return Function::NOT_INPLACE;
-    return Function::INPLACE_NOT_MODIFY;
-  }
-  virtual int inplace_grad_with(int i) const { return 0; }
 
 protected:
   NBLA_API virtual void setup_impl(const Variables &inputs,
-                                   const Variables &outputs);
+                                   Variable* output);
   NBLA_API virtual void forward_impl(const Variables &inputs,
-                                     const Variables &outputs);
+                                     Variable* output);
 };
 }
 #endif

@@ -12,42 +12,55 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/** Batch Normalization
+/** ReLU
  */
-#ifndef __NBLA_FUNCTION_BATCHNORM_HPP__
-#define __NBLA_FUNCTION_BATCHNORM_HPP__
+#ifndef __NBLA_FUNCTION_RELU_HPP__
+#define __NBLA_FUNCTION_RELU_HPP__
 
 #include <nbla/cpu.hpp>
 #include <nbla/function.hpp>
 #include <nbla/function_registry.hpp>
 
-#include <vector>
-
-using std::vector;
+#include <memory>
+#include <string>
 
 namespace nbla {
 
-NBLA_REGISTER_FUNCTION_HEADER(BatchNormalization, int);
+using std::string;
 
+NBLA_REGISTER_FUNCTION_HEADER(ReLU);
 
-template <typename T>
-class BatchNormalization
-    : public BaseFunction<int> {
-protected:
-  int axis_;
-  int size0_, size1_, size2_, size02_, size12_;
+/** Rectified Linear Unit (ReLU) defined as
+@f[
+y_i = \max (0, x_i).
+@f]
+
+Inputs:
+- N-D array.
+
+Outputs:
+- N-D array.
+
+@tparam T Data type for computation.
+@param inplace The output array is will be shared with the input array if true.
+\ingroup FunctionImplGrp
+ */
+template <typename T> class ReLU : public BaseFunction<> {
 
 public:
-  BatchNormalization(const Context &ctx, int axis)
-      : BaseFunction(ctx, axis), axis_(axis) {}
-  virtual ~BatchNormalization() {}
+  ReLU(const Context &ctx)
+      : BaseFunction(ctx) {}
+  virtual ~ReLU() {}
   virtual shared_ptr<Function> copy() const {
-    return create_BatchNormalization(ctx_, axis_);
+    return create_ReLU(ctx_);
   }
-  virtual int min_inputs() { return 2; }
-  virtual string name() { return "BatchNormalization"; }
+  virtual int min_inputs() { return 1; }
+  virtual string name() { return "ReLU"; }
   virtual vector<string> allowed_array_classes() {
     return SingletonManager::get<Cpu>()->array_classes();
+  }
+  virtual bool inplace_data() const {
+    return true;
   }
 
 protected:
@@ -55,8 +68,6 @@ protected:
                                    Variable* output);
   NBLA_API virtual void forward_impl(const Variables &inputs,
                                      Variable* output);
-  NBLA_API virtual void forward_impl_global(const Variables &inputs,
-                                            Variable* output);
 };
 }
 #endif

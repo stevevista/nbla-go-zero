@@ -28,7 +28,7 @@ namespace nbla {
 
 using std::string;
 
-NBLA_REGISTER_FUNCTION_HEADER(ReLU, bool);
+NBLA_REGISTER_FUNCTION_HEADER(ReLU);
 
 /** Rectified Linear Unit (ReLU) defined as
 @f[
@@ -45,40 +45,29 @@ Outputs:
 @param inplace The output array is will be shared with the input array if true.
 \ingroup FunctionImplGrp
  */
-template <typename T> class ReLU : public BaseFunction<bool> {
-protected:
-  bool inplace_;
+template <typename T> class ReLU : public Function {
 
 public:
-  ReLU(const Context &ctx, bool inplace)
-      : BaseFunction(ctx, inplace), inplace_(inplace) {}
+  ReLU(const Context &ctx)
+      : Function(ctx) {}
   virtual ~ReLU() {}
   virtual shared_ptr<Function> copy() const {
-    return create_ReLU(ctx_, inplace_);
+    return create_ReLU(ctx_);
   }
   virtual int min_inputs() { return 1; }
-  virtual int min_outputs() { return 1; }
-  virtual vector<dtypes> in_types() { return vector<dtypes>{get_dtype<T>()}; }
-  virtual vector<dtypes> out_types() { return vector<dtypes>{get_dtype<T>()}; }
   virtual string name() { return "ReLU"; }
   virtual vector<string> allowed_array_classes() {
     return SingletonManager::get<Cpu>()->array_classes();
   }
-  virtual bool grad_depends_output_data(int i, int o) const { return inplace_; }
-  virtual int inplace_data(int i) const {
-    return inplace_ ? Function::INPLACE : Function::NOT_INPLACE;
+  virtual bool inplace_data() const {
+    return true;
   }
-  virtual int inplace_data_with(int i) const { return 0; }
-  virtual int inplace_grad(int i) const {
-    return inplace_ ? Function::INPLACE : Function::NOT_INPLACE;
-  }
-  virtual int inplace_grad_with(int i) const { return 0; }
 
 protected:
   NBLA_API virtual void setup_impl(const Variables &inputs,
-                                   const Variables &outputs);
+                                   Variable* output);
   NBLA_API virtual void forward_impl(const Variables &inputs,
-                                     const Variables &outputs);
+                                     Variable* output);
 };
 }
 #endif

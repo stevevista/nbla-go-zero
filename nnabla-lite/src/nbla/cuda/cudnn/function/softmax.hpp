@@ -50,8 +50,8 @@ protected:
   cudnnTensorDescriptor_t input_desc_;
   cudnnTensorDescriptor_t output_desc_;
   cudnnSoftmaxAlgorithm_t algorithm_;
-  virtual void setup_impl(const Variables &inputs, const Variables &outputs);
-  virtual void forward_impl(const Variables &inputs, const Variables &outputs);
+  virtual void setup_impl(const Variables &inputs, Variable* output);
+  virtual void forward_impl(const Variables &inputs, Variable* output);
 };
 }
 #endif

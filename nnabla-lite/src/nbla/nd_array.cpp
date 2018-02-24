@@ -57,10 +57,6 @@ void NdArray::reshape(const Shape_t &shape, bool force) {
   array_.reset(new SyncedArray(size_));
 }
 
-NdArrayPtr NdArray::view(const Shape_t &shape) {
-  return make_shared<NdArray>(array_, shape);
-}
-
 Shape_t NdArray::shape() const { return shape_; }
 Shape_t NdArray::strides() const { return strides_; }
 

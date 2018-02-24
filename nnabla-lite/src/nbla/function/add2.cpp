@@ -20,36 +20,24 @@
 
 namespace nbla {
 
-NBLA_REGISTER_FUNCTION_SOURCE(Add2, bool);
+NBLA_REGISTER_FUNCTION_SOURCE(Add2);
 
 template <typename T>
-void Add2<T>::setup_impl(const Variables &inputs, const Variables &outputs) {
-  if (inputs[0]->shape() == inputs[1]->shape()) {
-    outputs[0]->reshape(inputs[0]->shape(), true);
-    if (inplace_) {
-      outputs[0]->data()->set_array(inputs[0]->data()->array());
-      outputs[0]->grad()->set_array(inputs[0]->grad()->array());
-    }
-    return;
-  }
+void Add2<T>::setup_impl(const Variables &inputs, Variable* output) {
+  NBLA_CHECK(inputs[0]->shape() == inputs[1]->shape(), error_code::value,
+                 "Shape of add2 variables mismatch. ");
+
+    output->reshape(inputs[0]->shape(), true);
+    output->set_array(inputs[0]->array());
 }
 
 template <class T>
-void Add2<T>::forward_impl(const Variables &inputs, const Variables &outputs) {
+void Add2<T>::forward_impl(const Variables &inputs, Variable* output) {
   const T *x0 = inputs[0]->get_data_pointer<T>(this->ctx_);
   const T *x1 = inputs[1]->get_data_pointer<T>(this->ctx_);
-  T *y = outputs[0]->cast_data_and_get_pointer<T>(this->ctx_);
+  T *y = output->cast_data_and_get_pointer<T>(this->ctx_);
   for (int s = 0; s < inputs[0]->size(); s++) {
     y[s] = x0[s] + x1[s];
-  }
-}
-template <typename T, bool accum>
-void add2_backward_cpu(int size, T *dx, const T *dy) {
-  for (int s = 0; s < size; ++s) {
-    if (accum)
-      dx[s] += dy[s];
-    else
-      dx[s] = dy[s];
   }
 }
 

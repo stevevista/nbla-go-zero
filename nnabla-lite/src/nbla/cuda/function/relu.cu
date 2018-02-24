@@ -27,20 +27,12 @@ __global__ void kernel_relu_forward(const int num, T *y, const T *x) {
   NBLA_CUDA_KERNEL_LOOP(idx, num) { y[idx] = max(T(0), x[idx]); }
 }
 
-template <typename T, bool accum = true>
-__global__ void kernel_relu_backward(const int num, T *dx, const T *x,
-                                     const T *dy) {
-  NBLA_CUDA_KERNEL_LOOP(idx, num) {
-    dx[idx] = (accum ? dx[idx] : 0) + (x[idx] > 0 ? dy[idx] : 0);
-  }
-}
-
 template <class T>
 void ReLUCuda<T>::forward_impl(const Variables &inputs,
-                               const Variables &outputs) {
+                               Variable* output) {
   cuda_set_device(std::stoi(this->ctx_.device_id));
   const T *x = inputs[0]->get_data_pointer<T>(this->ctx_);
-  T *y = outputs[0]->cast_data_and_get_pointer<T>(this->ctx_);
+  T *y = output->cast_data_and_get_pointer<T>(this->ctx_);
   size_t size = inputs[0]->size();
   NBLA_CUDA_LAUNCH_KERNEL_SIMPLE(kernel_relu_forward, size, y, x);
 }

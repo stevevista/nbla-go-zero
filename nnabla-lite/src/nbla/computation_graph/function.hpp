@@ -34,8 +34,7 @@ class CgFunction {
   int rank_{0};
   vector<CgVariablePtr> inputs_;
   FunctionPtr func_;
-  vector<std::weak_ptr<CgVariable>> outputs_;
-  bool need_grad_{false};
+  std::weak_ptr<CgVariable> output_;
   string info_;
 
 public:
@@ -59,40 +58,24 @@ public:
 
   /**
    */
-  inline bool need_grad() const { return need_grad_; }
-
-  /**
-   */
   inline int rank() const { return rank_; }
 
   /** Store outputs as weak references (weak_ptr).
 
       @param[in] outputs Function outputs.
    */
-  NBLA_API void set_outputs(const vector<CgVariablePtr> &outputs);
+  NBLA_API void set_output(CgVariablePtr output);
 
   /**
    */
   NBLA_API vector<CgVariablePtr> inputs() { return inputs_; }
 
-  /**
-   */
-  NBLA_API vector<CgVariablePtr> outputs();
-
   /** Get number of inputs.
    */
   inline size_t num_inputs() const { return inputs_.size(); }
 
-  /** Get number of outputs.
-   */
-  inline size_t num_outputs() const { return outputs_.size(); }
-
-  /** Update need_grad flag by seeing output variables.
-   */
-  NBLA_API bool update_need_grad();
-
   NBLA_API vector<Variable *> function_inputs();
-  NBLA_API vector<VariablePtr> function_outputs_shared();
+  NBLA_API VariablePtr function_output_shared();
 
   /**
    */
@@ -105,5 +88,8 @@ public:
 /**
  */
 typedef CgFunction::Ptr CgFunctionPtr;
+
+
+
 }
 #endif

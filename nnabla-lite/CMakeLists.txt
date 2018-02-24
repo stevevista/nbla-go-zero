@@ -126,22 +126,6 @@ string(STRIP ${NBLA_SETUP_LIB_DIR_RAW} NBLA_SETUP_LIB_DIR)
     list(APPEND NBLA_CUDA_INCLUDE_DIRS ${CUDNN_INCLUDE_DIRS})
     list(APPEND NBLA_CUDA_LINKER_LIBS ${CUDNN_LIBRARIES})
 
-    # Distributed Training
-    option(WITH_NCCL "Use nccl for distributed training" OFF)
-    if(WITH_NCCL)
-      add_definitions(-DFEATURE_DIST_TRAIN)
-      find_package(NCCL REQUIRED)
-      find_package(MPI REQUIRED)
-      list(APPEND NBLA_CUDA_INCLUDE_DIRS 
-        ${NCCL_INCLUDE_DIR}
-        ${MPI_INCLUDE_PATH}
-        )
-      list(APPEND NBLA_CUDA_LINKER_LIBS
-        ${NCCL_LIBRARIES}
-        ${MPI_LIBRARIES}
-        )
-    endif()
-
     include_directories(${NBLA_CUDA_INCLUDE_DIRS})
     message("CUDA libs: ${NBLA_CUDA_LINKER_LIBS}")
     message("CUDA includes: ${NBLA_CUDA_INCLUDE_DIRS}")

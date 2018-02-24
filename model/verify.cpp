@@ -8,7 +8,7 @@
 using std::make_shared;
 
 using namespace napp;
-
+/*
 
 float sec(clock_t clocks)
 {
@@ -101,13 +101,19 @@ void parse_commandline( int argc, char **argv ) {
         }
     }
 }
+*/
+void test_lite();
 
 int main(int argc, char **argv) {
+
+    test_lite();
+    return 0;
+/*
     parse_commandline(argc, argv);
     verify(
         opt_input, 
         opt_weights, 
         128);
-    return 0;
+    return 0;*/
 }
 

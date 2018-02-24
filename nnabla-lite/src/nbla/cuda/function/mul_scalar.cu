@@ -12,34 +12,36 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// tanh.cpp
+// mul_scalar.cu
 
-#include <nbla/cuda/function/tanh.hpp>
+#include <nbla/cuda/function/mul_scalar.hpp>
 #include <nbla/cuda/common.hpp>
 #include <nbla/cuda/cuda.hpp>
 
-#include <cmath>
 
 namespace nbla {
 
+
 template <typename T>
-__global__ void kernel_tanh_forward(int size, const T *x, T *y) {
-  NBLA_CUDA_KERNEL_LOOP(idx, size) { y[idx] = tanh(x[idx]); }
+__global__ void kernel_mul_scalar_forward(const int num, const T *x1, const T *x1, T *y) {
+  NBLA_CUDA_KERNEL_LOOP(idx, num) { y[idx] = x0[idx] * x1[0]; }
 }
 
-template <typename T>                                                   
-void TanhCuda<T>::forward_impl(const Variables &inputs,                   
-                                   Variable* output) {                
 
-    cuda_set_device(std::stoi(this->ctx_.device_id));
-    const T *x = inputs[0]->get_data_pointer<T>(this->ctx_);
+template <typename T>
+void MulScalarCuda<T>::forward_impl(const Variables &inputs,
+                                   Variable* output) {   
+
+    const T *x0 = inputs[0]->get_data_pointer<T>(this->ctx_);
+    const T *x1 = inputs[1]->get_data_pointer<T>(this->ctx_);
     T *y = output->cast_data_and_get_pointer<T>(this->ctx_);
-    int size = inputs[0]->size();
-    NBLA_CUDA_LAUNCH_KERNEL_SIMPLE(kernel_tanh_forward, size, x, y);
-               
-}                                                                           
+    int size = output->size();
+    cuda_set_device(std::stoi(this->ctx_.device_id));
+    NBLA_CUDA_LAUNCH_KERNEL_SIMPLE(kernel_mul_scalar_forward, size, x0, x1, y);
+}
 
 
 // Template instantiation
-template class TanhCuda<float>;
+template class MulScalarCuda<float>;
+
 }

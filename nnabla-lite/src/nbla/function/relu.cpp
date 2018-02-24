@@ -22,34 +22,23 @@
 
 namespace nbla {
 
-NBLA_REGISTER_FUNCTION_SOURCE(ReLU, bool);
+NBLA_REGISTER_FUNCTION_SOURCE(ReLU);
 
 template <typename T>
-void ReLU<T>::setup_impl(const Variables &inputs, const Variables &outputs) {
-  outputs[0]->reshape(inputs[0]->shape(), true);
-  if (inplace_) {
-    outputs[0]->data()->set_array(inputs[0]->data()->array());
-    outputs[0]->grad()->set_array(inputs[0]->grad()->array());
-  }
+void ReLU<T>::setup_impl(const Variables &inputs, Variable* output) {
+    output->reshape(inputs[0]->shape(), true);
+    output->set_array(inputs[0]->array());
 }
 
 template <class T>
-void ReLU<T>::forward_impl(const Variables &inputs, const Variables &outputs) {
+void ReLU<T>::forward_impl(const Variables &inputs, Variable* output) {
   const T *x = inputs[0]->get_data_pointer<T>(this->ctx_);
-  T *y = outputs[0]->cast_data_and_get_pointer<T>(this->ctx_);
+  T *y = output->cast_data_and_get_pointer<T>(this->ctx_);
   for (int s = 0; s < inputs[0]->size(); s++) {
     y[s] = std::max(T(0), x[s]);
   }
 }
-template <typename T, bool accum>
-void relu_backward_cpu(int size, T *dx, const T *dy, const T *x) {
-  for (int s = 0; s < size; ++s) {
-    if (accum)
-      dx[s] += (x[s] > 0 ? dy[s] : 0);
-    else
-      dx[s] = (x[s] > 0 ? dy[s] : 0);
-  }
-}
+
 
 template class ReLU<float>;
 }

@@ -22,15 +22,16 @@
 
 namespace nbla {
 
-NBLA_REGISTER_FUNCTION_SOURCE(Sink, bool);
+NBLA_REGISTER_FUNCTION_SOURCE(Sink);
 
 template <typename T>
-void Sink<T>::setup_impl(const Variables &inputs, const Variables &outputs) {
-  outputs[0]->reshape({}, true);
+void Sink<T>::setup_impl(const Variables &inputs, Variable* output) {
+    output->reshape(inputs[0]->shape(), true);
+    output->set_array(inputs[0]->array());
 }
 
 template <typename T>
-void Sink<T>::forward_impl(const Variables &inputs, const Variables &outputs) {}
+void Sink<T>::forward_impl(const Variables &inputs, Variable* output) {}
 
 // Template instanciation
 template class Sink<float>;

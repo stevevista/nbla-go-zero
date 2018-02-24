@@ -34,8 +34,21 @@
 #include <nbla/cuda/function/softmax.hpp>
 #include <nbla/cuda/function/batch_normalization.hpp>
 #include <nbla/cuda/function/add2.hpp>
-
+#include <nbla/cuda/function/mul_scalar.hpp>
 #include <nbla/garbage_collector.hpp>
+
+#include <nbla/array/cpu_array.hpp>
+#include <nbla/array_registry.hpp>
+#include <nbla/cuda/array/cuda_array.hpp>
+#include <nbla/cuda/cudnn/cudnn.hpp>
+#include <nbla/cuda/cudnn/function/convolution.hpp>
+#include <nbla/cuda/cudnn/function/tanh.hpp>
+#include <nbla/cuda/cudnn/function/relu.hpp>
+#include <nbla/cuda/cudnn/function/softmax.hpp>
+#include <nbla/cuda/cudnn/function/add2.hpp>
+#include <nbla/cuda/cudnn/init.hpp>
+#include <nbla/function_registry.hpp>
+#include <nbla/init.hpp>
 
 namespace nbla {
 
@@ -87,11 +100,26 @@ void init_cuda() {
   NBLA_REGISTER_FUNCTION_IMPL(Softmax, SoftmaxCudaf, 1, "cuda", "default", int);
 
   typedef BatchNormalizationCuda<float> BatchNormalizationCudaf;
-  NBLA_REGISTER_FUNCTION_IMPL(BatchNormalization, BatchNormalizationCudaf, 1, "cuda", "default", const vector<int> &);
+  NBLA_REGISTER_FUNCTION_IMPL(BatchNormalization, BatchNormalizationCudaf, 1, "cuda", "default", int);
 
   typedef Add2Cuda<float> Add2Cudaf;
-  NBLA_REGISTER_FUNCTION_IMPL(Add2, Add2Cudaf, 1, "cuda", "default", bool);
+  NBLA_REGISTER_FUNCTION_IMPL(Add2, Add2Cudaf, 1, "cuda", "default");
 
+  typedef MulScalarCuda<float> MulScalarCudaf;
+  NBLA_REGISTER_FUNCTION_IMPL(MulScalar, MulScalarCudaf, 1, "cuda", "default");
+
+
+  // Function registration
+  typedef ConvolutionCudaCudnn<float> ConvolutionCudaCudnnf;
+  NBLA_REGISTER_FUNCTION_IMPL(Convolution, ConvolutionCudaCudnnf, 2, "cuda", "cudnn", int, const vector<int> &, const vector<int> &, const vector<int> &, int);
+  typedef TanhCudaCudnn<float> TanhCudaCudnnf;
+  NBLA_REGISTER_FUNCTION_IMPL(Tanh, TanhCudaCudnnf, 2, "cuda", "cudnn");
+  typedef ReLUCudaCudnn<float> ReLUCudaCudnnf;
+  NBLA_REGISTER_FUNCTION_IMPL(ReLU, ReLUCudaCudnnf, 2, "cuda", "cudnn", bool);
+  typedef SoftmaxCudaCudnn<float> SoftmaxCudaCudnnf;
+  NBLA_REGISTER_FUNCTION_IMPL(Softmax, SoftmaxCudaCudnnf, 2, "cuda", "cudnn", int);
+  typedef Add2CudaCudnn<float> Add2CudaCudnnf;
+  NBLA_REGISTER_FUNCTION_IMPL(Add2, Add2CudaCudnnf, 2, "cuda", "cudnn");
 
   is_initialized = true;
 }

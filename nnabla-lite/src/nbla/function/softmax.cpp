@@ -26,13 +26,16 @@ namespace nbla {
 NBLA_REGISTER_FUNCTION_SOURCE(Softmax, int);
 
 template <typename T>
-void Softmax<T>::setup_impl(const Variables &inputs, const Variables &outputs) {
+void Softmax<T>::setup_impl(const Variables &inputs, Variable* output) {
   Shape_t in_shape = inputs[0]->shape();
   NBLA_CHECK(axis_ < in_shape.size(), error_code::value,
              "axis must be less than ndim of inputs[0]. "
              "axis: %d >= ndim of inputs[0]: %d.",
              axis_, in_shape.size());
-  outputs[0]->reshape(in_shape, true);
+  
+  output->reshape(inputs[0]->shape(), true);
+  output->set_array(inputs[0]->array());
+
   Size_t size = inputs[0]->size();
   Size_t size_axis = inputs[0]->size(axis_);
   size0_ = size / size_axis;          // Batch size.
@@ -44,10 +47,10 @@ void Softmax<T>::setup_impl(const Variables &inputs, const Variables &outputs) {
 
 template <class T>
 void Softmax<T>::forward_impl(const Variables &inputs,
-                              const Variables &outputs) {
+                              Variable* output) {
   // Setting up variables
   const T *x = inputs[0]->get_data_pointer<T>(this->ctx_);
-  T *y = outputs[0]->cast_data_and_get_pointer<T>(this->ctx_);
+  T *y = output->cast_data_and_get_pointer<T>(this->ctx_);
   for (int i0 = 0; i0 < size0_; ++i0) {
     for (int i2 = 0; i2 < size2_; ++i2) {
       const int j = i0 * size1_ * size2_ + i2;

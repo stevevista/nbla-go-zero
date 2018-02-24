@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include <nbla/cuda/cuda.hpp>
-#include <nbla/cuda/utils/random.hpp>
 #include <nbla/singleton_manager-internal.hpp>
 
 namespace nbla {
@@ -23,9 +22,6 @@ Cuda::Cuda() {}
 Cuda::~Cuda() {
   for (auto handle : this->cublas_handles_) {
     NBLA_CUBLAS_CHECK(cublasDestroy(handle.second));
-  }
-  for (auto gen : this->curand_generators_) {
-    curand_destroy_generator(gen.second);
   }
 }
 
@@ -43,29 +39,6 @@ cublasHandle_t Cuda::cublas_handle(int device) {
     return handle;
   }
   return it->second;
-}
-
-curandGenerator_t Cuda::curand_generator() {
-  // Get current device
-  int device = cuda_get_device();
-  std::lock_guard<decltype(mtx_curand_)> lock(mtx_curand_);
-  // Find device rng
-  auto it = this->curand_generators_.find(device);
-  // Create a new one
-  if (it == this->curand_generators_.end()) {
-    curandGenerator_t gen = curand_create_generator();
-    this->curand_generators_.insert({device, gen});
-    return gen;
-  }
-  return it->second;
-}
-
-void Cuda::curand_set_seed(int seed) {
-  ::nbla::curand_set_seed(curand_generator(), seed);
-}
-
-template <> void Cuda::curand_generate_uniform<float>(float *r, int size) {
-  ::nbla::curand_generate_rand(curand_generator(), float(0), float(1), r, size);
 }
 
 vector<string> Cuda::array_classes() const { return array_classes_; }

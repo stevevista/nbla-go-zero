@@ -26,23 +26,24 @@ namespace nbla {
 
 template <typename T>
 void ReLUCudaCudnn<T>::setup_impl(const Variables &inputs,
-                                  const Variables &outputs) {
-  outputs[0]->reshape(inputs[0]->shape(), true);
+                                  Variable* output) {
+
+  ReLU<T>::setup_impl(inputs, output);
   cudnn_handle_ = SingletonManager::get<CudnnHandleManager>()->handle(device_);
   NBLA_CUDNN_CHECK(cudnnSetTensor4dDescriptor(input_desc_, CUDNN_TENSOR_NCHW,
                                               cudnn_data_type<T>::type(), 1, 1,
                                               1, inputs[0]->size()));
   NBLA_CUDNN_CHECK(cudnnSetTensor4dDescriptor(output_desc_, CUDNN_TENSOR_NCHW,
                                               cudnn_data_type<T>::type(), 1, 1,
-                                              1, outputs[0]->size()));
+                                              1, output->size()));
 }
 
 template <typename T>
 void ReLUCudaCudnn<T>::forward_impl(const Variables &inputs,
-                                    const Variables &outputs) {
+                                    Variable* output) {
   cuda_set_device(std::stoi(this->ctx_.device_id));
   const T *x = inputs[0]->get_data_pointer<T>(this->ctx_);
-  T *y = outputs[0]->cast_data_and_get_pointer<T>(this->ctx_);
+  T *y = output->cast_data_and_get_pointer<T>(this->ctx_);
   T alpha = 1;
   T beta = 0;
 #if CUDNN_VERSION >= 5000

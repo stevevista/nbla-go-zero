@@ -34,7 +34,7 @@ NBLA_REGISTER_FUNCTION_SOURCE(Convolution, int,    // base_axis
 
 template <typename T>
 void Convolution<T>::setup_impl(const Variables &inputs,
-                                const Variables &outputs) {
+                                Variable* output) {
   // Shape check
   Shape_t shape_data = inputs[0]->shape();
   Shape_t shape_weights = inputs[1]->shape();
@@ -102,7 +102,7 @@ void Convolution<T>::setup_impl(const Variables &inputs,
     inner_size_i_ *= spatial_shape_i_[i];
     inner_size_o_ *= spatial_shape_o_[i];
   }
-  outputs[0]->reshape(shape_out, true);
+  output->reshape(shape_out, true);
 
   // Reshaping col buffer
   // Actual memory is not allocated until it is used.
@@ -134,13 +134,13 @@ void Convolution<T>::setup_impl(const Variables &inputs,
 
 template <class T>
 void Convolution<T>::forward_impl(const Variables &inputs,
-                                  const Variables &outputs) {
+                                  Variable* output) {
   using namespace ::nbla::eigen;
   // Getting variable pointers
   const T *x = inputs[0]->get_data_pointer<T>(this->ctx_);
   const T *w = inputs[1]->get_data_pointer<T>(this->ctx_);
   T *col = col_.cast_data_and_get_pointer<T>(this->ctx_);
-  T *y = outputs[0]->cast_data_and_get_pointer<T>(this->ctx_);
+  T *y = output->cast_data_and_get_pointer<T>(this->ctx_);
   const T *b;
   if (inputs.size() == 3) {
     b = inputs[2]->get_data_pointer<T>(this->ctx_);

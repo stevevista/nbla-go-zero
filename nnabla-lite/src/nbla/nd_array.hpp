@@ -22,6 +22,8 @@ namespace nbla {
 /** Dtype and backend agnotic multi-dimensional array.
  */
 class NdArray {
+
+protected:
   SyncedArrayPtr array_;
   Shape_t shape_;
   Shape_t strides_;
@@ -59,12 +61,6 @@ public:
      diffrent one.
    */
   NBLA_API void reshape(const Shape_t &shape, bool force = false);
-
-  /** Create an another instance with different shape but sharing array content.
-
-      @param[in] shape N-d array reshaped to.
-   */
-  NBLA_API Ptr view(const Shape_t &shape);
 
   /** Get shape.
    */

@@ -108,12 +108,7 @@ public:
                               group_);
   }
 
-  virtual vector<dtypes> in_types() {
-    return vector<dtypes>{get_dtype<T>(), get_dtype<T>(), get_dtype<T>()};
-  }
-  virtual vector<dtypes> out_types() { return vector<dtypes>{get_dtype<T>()}; }
   virtual int min_inputs() { return 2; }
-  virtual int min_outputs() { return 1; }
   virtual string name() { return "Convolution"; }
   virtual vector<string> allowed_array_classes() {
     return SingletonManager::get<Cpu>()->array_classes();
@@ -121,9 +116,9 @@ public:
 
 protected:
   NBLA_API virtual void setup_impl(const Variables &inputs,
-                                   const Variables &outputs);
+                                   Variable* output);
   NBLA_API virtual void forward_impl(const Variables &inputs,
-                                     const Variables &outputs);
+                                     Variable* output);
 };
 }
 #endif

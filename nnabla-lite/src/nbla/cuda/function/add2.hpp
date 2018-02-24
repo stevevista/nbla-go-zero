@@ -22,7 +22,7 @@ namespace nbla {
 
 template <typename T> class Add2Cuda : public Add2<T> {
 public:
-  explicit Add2Cuda(const Context &ctx, bool inplace) : Add2<T>(ctx, inplace) {}
+  explicit Add2Cuda(const Context &ctx) : Add2<T>(ctx) {}
   virtual ~Add2Cuda() {}
   virtual string name() { return "Add2Cuda"; }
   virtual vector<string> allowed_array_classes() {
@@ -30,7 +30,7 @@ public:
   }
 
 protected:
-  virtual void forward_impl(const Variables &inputs, const Variables &outputs);
+  virtual void forward_impl(const Variables &inputs, Variable* output);
 };
 }
 #endif

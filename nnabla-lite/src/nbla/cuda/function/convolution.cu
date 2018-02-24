@@ -30,20 +30,20 @@ namespace nbla {
 
 template <typename T>
 void ConvolutionCuda<T>::setup_impl(const Variables &inputs,
-                                    const Variables &outputs) {
-  Convolution<T>::setup_impl(inputs, outputs);
+                                    Variable* output) {
+  Convolution<T>::setup_impl(inputs, output);
 }
 
 template <class T>
 void ConvolutionCuda<T>::forward_impl(const Variables &inputs,
-                                      const Variables &outputs) {
+                                      Variable* output) {
   cuda_set_device(std::stoi(this->ctx_.device_id));
   // Getting variable pointers
   const T *x = inputs[0]->get_data_pointer<T>(this->ctx_);
   const T *w = inputs[1]->get_data_pointer<T>(this->ctx_);
   Variable *vcol = &this->col_;
   T *col = vcol->cast_data_and_get_pointer<T>(this->ctx_);
-  float *y = outputs[0]->cast_data_and_get_pointer<T>(this->ctx_);
+  float *y = output->cast_data_and_get_pointer<T>(this->ctx_);
   const T *b;
   if (inputs.size() == 3) {
     b = inputs[2]->get_data_pointer<T>(this->ctx_);

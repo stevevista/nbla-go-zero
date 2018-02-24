@@ -33,27 +33,8 @@ public:
                                 const vector<int> &dilation, int group)
       : Convolution<T>(ctx, base_axis, pad, stride, dilation, group),
         device_(std::stoi(ctx.device_id)) {
-#if CUDNN_VERSION < 6000
-    // NOTE: dilation > 1 is not supported by cudnn. (2016.10.19)
-    for (int i = 0; i < dilation.size(); ++i) {
-      if (dilation[i] > 1) {
-        // Fall back to origianl CUDA implementation if dilation > 1.
-        // Setting fall_back_func_ overwrites behaviors of setup, forward and
-        // backward functions by the specified function class instance.
-        std::cout << "Falling back to ConvolutionCuda since dilation > 1 is "
-                     "not supported in cuDNN."
-                  << std::endl; // TODO: warn.
-        this->fall_back_func_.reset(new ConvolutionCuda<T>(
-            ctx, base_axis, pad, stride, dilation, group));
-        return;
-      }
-    }
-#endif
   }
-  virtual ~ConvolutionCudaCudnn() {
-    if (this->fall_back_func_)
-      return;
-  }
+
   virtual string name() { return "ConvolutionCudaCudnn"; }
   virtual vector<string> allowed_array_classes() {
     return SingletonManager::get<Cuda>()->array_classes();
@@ -68,10 +49,10 @@ protected:
   int b_offset_;
   int y_offset_;
   shared_ptr<CudnnConv2dResource> rsc2d_;
-  virtual void setup_impl(const Variables &inputs, const Variables &outputs);
-  void setup_impl_2d(const Variables &inputs, const Variables &outputs);
-  void setup_impl_nd(const Variables &inputs, const Variables &outputs);
-  virtual void forward_impl(const Variables &inputs, const Variables &outputs);
+  virtual void setup_impl(const Variables &inputs, Variable* output);
+  void setup_impl_2d(const Variables &inputs, Variable* output);
+  void setup_impl_nd(const Variables &inputs, Variable* output);
+  virtual void forward_impl(const Variables &inputs, Variable* output);
 };
 }
 #endif

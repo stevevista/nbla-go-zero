@@ -30,7 +30,7 @@ public:
 
 protected:
   int device_;
-  virtual void forward_impl(const Variables &inputs, const Variables &outputs);
+  virtual void forward_impl(const Variables &inputs, Variable* output);
 };
 }
 #endif

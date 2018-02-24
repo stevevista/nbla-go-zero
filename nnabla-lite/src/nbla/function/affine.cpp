@@ -26,7 +26,7 @@ namespace nbla {
 NBLA_REGISTER_FUNCTION_SOURCE(Affine, int);
 
 template <typename T>
-void Affine<T>::setup_impl(const Variables &inputs, const Variables &outputs) {
+void Affine<T>::setup_impl(const Variables &inputs, Variable* output) {
   Shape_t shape_data = inputs[0]->shape();
   Shape_t shape_weights = inputs[1]->shape();
   NBLA_CHECK(shape_weights.size() >= 2, error_code::value,
@@ -52,10 +52,10 @@ void Affine<T>::setup_impl(const Variables &inputs, const Variables &outputs) {
   for (int i = 1; i < shape_weights.size(); ++i) {
     shape_out.push_back(shape_weights[i]);
   }
-  outputs[0]->reshape(shape_out, true);
+  output->reshape(shape_out, true);
   NBLA_CHECK(i_col_ == w_row_, error_code::value, "Shape mismatch.");
-  NBLA_CHECK(outputs[0]->size() == o_row_ * o_col_, error_code::value,
-             "Shape mismatch. %ld %ld %ld", outputs[0]->size(), o_row_, o_col_);
+  NBLA_CHECK(output->size() == o_row_ * o_col_, error_code::value,
+             "Shape mismatch. %ld %ld %ld", output->size(), o_row_, o_col_);
   if (inputs.size() == 3) {
     // With bias
     Shape_t shape_bias = inputs[2]->shape();
@@ -74,11 +74,11 @@ void Affine<T>::setup_impl(const Variables &inputs, const Variables &outputs) {
 
 template <class T>
 void Affine<T>::forward_impl(const Variables &inputs,
-                             const Variables &outputs) {
+                             Variable* output) {
   using namespace ::nbla::eigen;
   const T *x = inputs[0]->get_data_pointer<T>(this->ctx_);
   const T *w = inputs[1]->get_data_pointer<T>(this->ctx_);
-  T *y = outputs[0]->cast_data_and_get_pointer<T>(this->ctx_);
+  T *y = output->cast_data_and_get_pointer<T>(this->ctx_);
   ConstMatrixMap<T> mx(x, i_row_, i_col_);
   ConstMatrixMap<T> mw(w, w_row_, w_col_);
   MatrixMap<T> my(y, o_row_, o_col_);

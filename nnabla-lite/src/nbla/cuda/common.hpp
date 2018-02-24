@@ -159,10 +159,6 @@ inline int cuda_get_blocks_by_size(int size) {
   for (int idx = blockIdx.x * blockDim.x + threadIdx.x; idx < (num);           \
        idx += blockDim.x * gridDim.x)
 
-/** Instantiate template CUDA functions */
-#define NBLA_INSTANTIATE_CUDA_FUNCS(type, classname)                           \
-  template void classname<type>::forward_impl(const Variables &inputs,         \
-                                              const Variables &outputs);
 
 /** CUDA device setter
 @return index of device before change

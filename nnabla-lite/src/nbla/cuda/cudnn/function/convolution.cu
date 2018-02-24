@@ -25,20 +25,20 @@ namespace nbla {
 
 template <typename T>
 void ConvolutionCudaCudnn<T>::setup_impl(const Variables &inputs,
-                                         const Variables &outputs) {
+                                         Variable* output) {
   cuda_set_device(std::stoi(this->ctx_.device_id));
-  Convolution<T>::setup_impl(inputs, outputs);
+  Convolution<T>::setup_impl(inputs, output);
   cudnn_handle_ = SingletonManager::get<CudnnHandleManager>()->handle(device_);
   if (this->spatial_dims_ == 2) {
-    setup_impl_2d(inputs, outputs);
+    setup_impl_2d(inputs, output);
   } else {
-    setup_impl_nd(inputs, outputs);
+    setup_impl_nd(inputs, output);
   }
 }
 
 template <typename T>
 void ConvolutionCudaCudnn<T>::setup_impl_2d(const Variables &inputs,
-                                            const Variables &outputs) {
+                                            Variable* output) {
   // Set input tensor descriptor
   /*
   const int x_n = this->outer_size_;
@@ -102,18 +102,18 @@ void ConvolutionCudaCudnn<T>::setup_impl_2d(const Variables &inputs,
 
 template <class T>
 void ConvolutionCudaCudnn<T>::setup_impl_nd(const Variables &inputs,
-                                            const Variables &outputs) {
+                                            Variable* output) {
   NBLA_ERROR(error_code::not_implemented,
              "2D convolution is only supported so far.");
 }
 
 template <class T>
 void ConvolutionCudaCudnn<T>::forward_impl(const Variables &inputs,
-                                           const Variables &outputs) {
+                                           Variable* output) {
   cuda_set_device(std::stoi(this->ctx_.device_id));
   const T *x = inputs[0]->get_data_pointer<T>(this->ctx_);
   const T *w = inputs[1]->get_data_pointer<T>(this->ctx_);
-  T *y = outputs[0]->cast_data_and_get_pointer<T>(this->ctx_);
+  T *y = output->cast_data_and_get_pointer<T>(this->ctx_);
   T alpha = 1;
   T beta = 0;
   const T *b;
